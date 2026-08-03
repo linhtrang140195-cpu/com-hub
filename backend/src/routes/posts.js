@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { query, newId } from '../db.js';
 import { detectConflicts } from '../services/conflictDetect.js';
+import { requireAuth, requireAdmin, requireCampaignAccess, campaignIdFromPost } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET /api/posts?campaign_id=&from=&to=&operator=&status=
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const { campaign_id, from, to, operator, status, include_conflicts } = req.query;
   const email = req.headers['x-user-email'];
 
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, requireCampaignAccess(campaignIdFromPost), async (req, res) => {
   const { rows } = await query(
     `SELECT p.*, c.name AS campaign_name, c.color AS campaign_color, c.type AS campaign_type,
             c.tone, c.slogan, c.tone_rules, c.website
@@ -58,7 +59,7 @@ router.get('/:id', async (req, res) => {
   res.json(rows[0]);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const b = req.body;
   const id = newId();
   await query(
@@ -73,7 +74,7 @@ router.post('/', async (req, res) => {
   res.json(rows[0]);
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, requireCampaignAccess(campaignIdFromPost), async (req, res) => {
   const plainFields = ['post_type', 'title', 'description', 'caption_hint', 'seatalk_caption',
     'web_caption', 'visual_template', 'operator_email', 'status', 'approval_status',
     'st_seen', 'st_react', 'st_reply', 'web_views', 'sailor_views', 'live_link', 'notes', 'phase_id'];
@@ -94,7 +95,7 @@ router.patch('/:id', async (req, res) => {
   res.json(rows[0]);
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   await query('DELETE FROM posts WHERE id = ?', [req.params.id]);
   res.json({ ok: true });
 });

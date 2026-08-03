@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { query, pool, newId } from '../db.js';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
+router.use(requireAdmin);
 
 router.get('/campaign/:campaignId', async (req, res) => {
   const { rows } = await query(

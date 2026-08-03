@@ -2,8 +2,10 @@ import { Router } from 'express';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import { query, pool, newId } from '../db.js';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
+router.use(requireAdmin);
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Parse Excel & return preview of posts (no DB write yet)

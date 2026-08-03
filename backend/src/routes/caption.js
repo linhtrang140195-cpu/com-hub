@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { generateCaption } from '../services/claude.js';
+import { requireAuth, requireCampaignAccess } from '../middleware/auth.js';
 
 const router = Router();
 
-router.post('/generate', async (req, res) => {
+router.post('/generate', requireAuth, requireCampaignAccess(req => req.body.campaign_id), async (req, res) => {
   try {
     const { campaign_id, post_type, inputs, output_format } = req.body;
     if (!campaign_id || !post_type) return res.status(400).json({ error: 'campaign_id, post_type required' });

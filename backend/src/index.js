@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { initSchema, pool } from './db.js';
+import { attachUser } from './middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -33,6 +34,8 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (_, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+app.use('/api', attachUser);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

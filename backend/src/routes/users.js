@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { query } from '../db.js';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
+router.use(requireAdmin);
 
 router.get('/', async (_req, res) => {
   const { rows } = await query('SELECT email, name, role, created_at FROM users ORDER BY name');

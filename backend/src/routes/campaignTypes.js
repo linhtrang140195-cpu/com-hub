@@ -1,21 +1,22 @@
 import { Router } from 'express';
 import { query } from '../db.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
+router.get('/', requireAuth, async (_req, res) => {
   const { rows } = await query('SELECT * FROM campaign_types ORDER BY is_builtin DESC, label');
   res.json(rows);
 });
 
-router.get('/:key', async (req, res) => {
+router.get('/:key', requireAuth, async (req, res) => {
   const { rows } = await query('SELECT * FROM campaign_types WHERE `key` = ?', [req.params.key]);
   if (!rows.length) return res.status(404).json({ error: 'Not found' });
   res.json(rows[0]);
 });
 
 // Admin creates a brand new campaign type from the UI
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { key, label, color, default_phases, post_types, default_tone_rules, metrics } = req.body;
   if (!key || !label) return res.status(400).json({ error: 'key, label required' });
   await query(
@@ -32,7 +33,7 @@ router.post('/', async (req, res) => {
   res.json(rows[0]);
 });
 
-router.patch('/:key', async (req, res) => {
+router.patch('/:key', requireAdmin, async (req, res) => {
   const fields = ['label', 'color'];
   const jsonFields = ['default_phases', 'post_types', 'default_tone_rules', 'metrics'];
   const sets = [];
@@ -50,7 +51,7 @@ router.patch('/:key', async (req, res) => {
   res.json(rows[0]);
 });
 
-router.delete('/:key', async (req, res) => {
+router.delete('/:key', requireAdmin, async (req, res) => {
   const { rows } = await query('SELECT is_builtin FROM campaign_types WHERE `key` = ?', [req.params.key]);
   if (rows[0]?.is_builtin) return res.status(400).json({ error: 'Không thể xoá loại campaign mặc định' });
   await query('DELETE FROM campaign_types WHERE `key` = ?', [req.params.key]);

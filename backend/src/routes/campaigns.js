@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { query, pool, newId } from '../db.js';
+import { requireAuth, requireAdmin, requireCampaignAccess } from '../middleware/auth.js';
 
 const router = Router();
 
 // List campaigns — filter by operator email if X-User-Email is not admin
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const email = req.headers['x-user-email'];
   let campaigns;
   if (email) {
@@ -65,7 +66,7 @@ router.get('/', async (req, res) => {
   res.json(campaigns);
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, requireCampaignAccess(req => req.params.id), async (req, res) => {
   const { rows } = await query('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
   if (!rows.length) return res.status(404).json({ error: 'Not found' });
   const campaign = rows[0];
@@ -74,7 +75,7 @@ router.get('/:id', async (req, res) => {
   res.json({ ...campaign, phases, assignments: assigns });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -117,7 +118,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAdmin, async (req, res) => {
   const fields = ['name', 'type', 'status', 'website', 'tone', 'slogan', 'color'];
   const dateFields = ['start_date', 'end_date'];
   const sets = [];
@@ -137,13 +138,13 @@ router.patch('/:id', async (req, res) => {
   res.json(rows[0]);
 });
 
-router.post('/:id/archive', async (req, res) => {
+router.post('/:id/archive', requireAdmin, async (req, res) => {
   await query(`UPDATE campaigns SET status='archived', archived_at=NOW() WHERE id=?`, [req.params.id]);
   const { rows } = await query('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
   res.json(rows[0]);
 });
 
-router.post('/:id/assignments', async (req, res) => {
+router.post('/:id/assignments', requireAdmin, async (req, res) => {
   const { email } = req.body;
   await query(
     `INSERT IGNORE INTO campaign_assignments (campaign_id, user_email) VALUES (?,?)`,
@@ -152,7 +153,7 @@ router.post('/:id/assignments', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/:id/assignments/:email', async (req, res) => {
+router.delete('/:id/assignments/:email', requireAdmin, async (req, res) => {
   await query('DELETE FROM campaign_assignments WHERE campaign_id=? AND LOWER(user_email)=LOWER(?)', [req.params.id, req.params.email]);
   res.json({ ok: true });
 });

@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { query, pool, newId } from '../db.js';
+import { requireAuth, requireAdmin, requireCampaignAccess } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/campaign/:campaignId', async (req, res) => {
+router.get('/campaign/:campaignId', requireAuth, requireCampaignAccess(req => req.params.campaignId), async (req, res) => {
   const { rows } = await query(
     'SELECT * FROM campaign_phases WHERE campaign_id = ? ORDER BY order_index',
     [req.params.campaignId]
@@ -11,7 +12,7 @@ router.get('/campaign/:campaignId', async (req, res) => {
   res.json(rows);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { campaign_id, order_index, name, start_date, end_date } = req.body;
   const id = newId();
   await query(
@@ -24,7 +25,7 @@ router.post('/', async (req, res) => {
 });
 
 // Smart reschedule: change phase dates → shift posts by delta
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAdmin, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -64,7 +65,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   await query('DELETE FROM campaign_phases WHERE id = ?', [req.params.id]);
   res.json({ ok: true });
 });
