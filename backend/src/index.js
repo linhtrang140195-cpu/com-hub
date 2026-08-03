@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 import { seedCampaignTypes } from './seed/campaignTypes.js';
 import { seedIfEmpty } from './seed/aov2026.js';
+import { seedTestCampaigns } from './seed/testCampaigns.js';
 
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
@@ -61,6 +62,7 @@ async function start() {
   await initSchema();
   await seedCampaignTypes(pool);
   await seedIfEmpty();
+  await seedTestCampaigns();
   app.listen(PORT, () => {
     console.log(`[server] Comms Hub backend on :${PORT}`);
   });

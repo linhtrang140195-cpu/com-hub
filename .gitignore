@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Backend secrets — never commit real DB/API credentials
+backend/.env
+!backend/.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
