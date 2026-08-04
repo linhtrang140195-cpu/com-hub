@@ -66,6 +66,9 @@ export default function Sidebar({ campaigns = [], onNewCampaign, activeCampaignI
             </NavLink>
           ))}
 
+          <div className="px-4 pt-5 pb-2 text-[10px] text-slate-400 font-bold tracking-widest">THAO TÁC CỦA TÔI</div>
+          {OPERATOR_NAV.map(item => <NavItem key={item.to} {...item} />)}
+
           <div className="mt-auto p-4">
             <button
               onClick={onNewCampaign}

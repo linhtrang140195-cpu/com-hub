@@ -24,8 +24,10 @@ export default function TodayChecklist() {
   const done = posts.filter(p => p.status === 'posted');
   const pending = posts.filter(p => p.status !== 'posted');
 
-  const handleQuickComplete = async (post) => {
-    await api.patch(`/posts/${post.id}`, { status: 'posted' });
+  const handleToggleComplete = async (post) => {
+    const nextStatus = post.status === 'posted' ? 'scheduled' : 'posted';
+    const body = nextStatus === 'scheduled' ? { status: nextStatus, posted_at: null } : { status: nextStatus };
+    await api.patch(`/posts/${post.id}`, body);
     load();
   };
 
@@ -63,7 +65,7 @@ export default function TodayChecklist() {
           return (
             <div key={p.id} className={`flex items-start gap-3.5 px-5 py-4 border-t border-slate-50 first:border-t-0 ${isDone ? 'bg-green-50/40' : ''}`}>
               <div
-                onClick={() => handleQuickComplete(p)}
+                onClick={() => handleToggleComplete(p)}
                 className="w-5 h-5 rounded shrink-0 mt-0.5 border-2 cursor-pointer flex items-center justify-center"
                 style={{ borderColor: isDone ? '#4CAF50' : '#ddd', background: isDone ? '#4CAF50' : 'transparent' }}
               >

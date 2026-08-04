@@ -85,6 +85,7 @@ router.patch('/:id', requireAuth, requireCampaignAccess(campaignIdFromPost), asy
   }
   if ('scheduled_at' in req.body) { sets.push('scheduled_at = ?'); values.push(new Date(req.body.scheduled_at)); }
   if ('channels' in req.body) { sets.push('channels = ?'); values.push(JSON.stringify(req.body.channels)); }
+  if ('posted_at' in req.body) { sets.push('posted_at = ?'); values.push(req.body.posted_at ? new Date(req.body.posted_at) : null); }
   if (!sets.length) return res.status(400).json({ error: 'No fields' });
   if (req.body.status === 'posted' && !('posted_at' in req.body)) {
     sets.push('posted_at = NOW()');

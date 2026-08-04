@@ -13,6 +13,9 @@ export default function CampaignDetail() {
   const [editingPhase, setEditingPhase] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [reschedulePreview, setReschedulePreview] = useState(null);
+  const [newOperatorEmail, setNewOperatorEmail] = useState('');
+  const [operatorError, setOperatorError] = useState('');
+  const [addingOperator, setAddingOperator] = useState(false);
 
   const load = useCallback(async () => {
     const c = await api.get(`/campaigns/${id}`);
@@ -40,6 +43,27 @@ export default function CampaignDetail() {
       setReschedulePreview({ phaseName: phase.name, shifted: result.shifted_posts });
       setTimeout(() => setReschedulePreview(null), 4000);
     }
+    load();
+  };
+
+  const handleAddOperator = async () => {
+    const email = newOperatorEmail.trim().toLowerCase();
+    setOperatorError('');
+    if (!email) return;
+    setAddingOperator(true);
+    try {
+      await api.post(`/campaigns/${id}/assignments`, { email });
+      setNewOperatorEmail('');
+      load();
+    } catch (e) {
+      setOperatorError(e.message);
+    } finally {
+      setAddingOperator(false);
+    }
+  };
+
+  const handleRemoveOperator = async (email) => {
+    await api.delete(`/campaigns/${id}/assignments/${encodeURIComponent(email)}`);
     load();
   };
 
@@ -113,6 +137,47 @@ export default function CampaignDetail() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Operators */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+        <div className="text-xs font-bold text-slate-400 tracking-wide mb-3.5">OPERATORS ({campaign.assignments?.length || 0})</div>
+        <div className="flex flex-wrap gap-2 mb-3.5">
+          {(campaign.assignments || []).map(a => (
+            <div key={a.user_email} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full pl-3 pr-1.5 py-1">
+              <span className="text-xs font-medium">{a.user_email}</span>
+              <span className="text-[10px] text-slate-400">{a.role_in_campaign}</span>
+              <button
+                onClick={() => handleRemoveOperator(a.user_email)}
+                className="w-4 h-4 rounded-full bg-slate-200 hover:bg-red-100 hover:text-red-600 text-slate-500 text-[10px] flex items-center justify-center cursor-pointer"
+                title="Gỡ khỏi campaign"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {(!campaign.assignments || campaign.assignments.length === 0) && (
+            <span className="text-xs text-slate-400">Chưa có operator nào — thêm bên dưới.</span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            placeholder="email@garena.vn"
+            value={newOperatorEmail}
+            onChange={e => setNewOperatorEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAddOperator()}
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none"
+          />
+          <button
+            onClick={handleAddOperator}
+            disabled={addingOperator}
+            className="bg-[#1A1A2E] text-white text-xs font-bold rounded-lg px-4 py-2 cursor-pointer disabled:opacity-50"
+          >
+            + Thêm
+          </button>
+        </div>
+        {operatorError && <div className="text-xs text-red-600 mt-2">{operatorError}</div>}
       </div>
 
       {/* Posts tracking */}

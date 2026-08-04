@@ -100,10 +100,17 @@ router.post('/', requireAdmin, async (req, res) => {
     }
     if (Array.isArray(operators)) {
       for (const opEmail of operators) {
+        const lowerEmail = opEmail.trim().toLowerCase();
+        if (!lowerEmail) continue;
+        // Auto-provision as 'operator' if this email hasn't been added before
+        await conn.query(
+          `INSERT IGNORE INTO users (email, name, role) VALUES (?, ?, 'operator')`,
+          [lowerEmail, lowerEmail.split('@')[0]]
+        );
         await conn.query(
           `INSERT IGNORE INTO campaign_assignments (campaign_id, user_email, role_in_campaign)
            VALUES (?,?,'operator')`,
-          [id, opEmail.toLowerCase()]
+          [id, lowerEmail]
         );
       }
     }
@@ -145,10 +152,19 @@ router.post('/:id/archive', requireAdmin, async (req, res) => {
 });
 
 router.post('/:id/assignments', requireAdmin, async (req, res) => {
-  const { email } = req.body;
+  const { email, name } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+  const lowerEmail = email.trim().toLowerCase();
+
+  // Auto-provision the user as 'operator' if this email hasn't logged in / been added before —
+  // adding someone to a campaign is how Admin grants them access in the first place.
+  await query(
+    `INSERT IGNORE INTO users (email, name, role) VALUES (?, ?, 'operator')`,
+    [lowerEmail, name || lowerEmail.split('@')[0]]
+  );
   await query(
     `INSERT IGNORE INTO campaign_assignments (campaign_id, user_email) VALUES (?,?)`,
-    [req.params.id, email.toLowerCase()]
+    [req.params.id, lowerEmail]
   );
   res.json({ ok: true });
 });
