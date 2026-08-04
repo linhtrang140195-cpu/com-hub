@@ -18,7 +18,8 @@ export default function CaptionGenerator() {
   const [campaign, setCampaign] = useState(activeCampaign);
   const [campaignType, setCampaignType] = useState(null);
   const [postType, setPostType] = useState('');
-  const [inputs, setInputs] = useState({ team_a: '', team_b: '', score: '', key_moment: '', context: '' });
+  const [inputs, setInputs] = useState({ team_a: '', team_b: '', score: '', key_moment: '', context: '', custom_prompt: '' });
+  const [provider, setProvider] = useState('claude');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -68,6 +69,7 @@ export default function CaptionGenerator() {
           post_type: postType,
           inputs,
           date: post?.scheduled_at || new Date().toISOString(),
+          provider,
         });
       } else {
         output = generateTemplateCaption(postType, inputs, campaign);
@@ -216,6 +218,42 @@ export default function CaptionGenerator() {
             placeholder="VD: Đội A lật ngược từ 0-1 lên 2-1..."
             className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none h-[72px] resize-none"
           />
+        </div>
+        <div className="mb-5">
+          <div className="text-[11px] text-slate-400 mb-1.5">Custom prompt (optional — chỉ dẫn tự do cho AI, sẽ ưu tiên hơn các ô trên)</div>
+          <textarea
+            value={inputs.custom_prompt}
+            onChange={e => setInputs(i => ({ ...i, custom_prompt: e.target.value }))}
+            placeholder="VD: Viết theo giọng hài hước, nhắc đến việc đây là trận derby..."
+            className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none h-[60px] resize-none"
+          />
+        </div>
+        <div className="mb-5">
+          <div className="text-[11px] text-slate-400 mb-1.5">AI Provider</div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setProvider('claude')}
+              className="rounded-full px-3.5 py-1.5 text-xs cursor-pointer"
+              style={{
+                background: provider === 'claude' ? '#E94560' : '#F0F0F5',
+                color: provider === 'claude' ? '#fff' : '#555',
+                fontWeight: provider === 'claude' ? 700 : 400,
+              }}
+            >
+              🤖 Claude
+            </button>
+            <button
+              onClick={() => setProvider('openai')}
+              className="rounded-full px-3.5 py-1.5 text-xs cursor-pointer"
+              style={{
+                background: provider === 'openai' ? '#E94560' : '#F0F0F5',
+                color: provider === 'openai' ? '#fff' : '#555',
+                fontWeight: provider === 'openai' ? 700 : 400,
+              }}
+            >
+              🟢 ChatGPT
+            </button>
+          </div>
         </div>
 
         {error && <div className="text-xs text-red-600 mb-3">{error}</div>}

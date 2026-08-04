@@ -15,6 +15,7 @@
     "express-async-errors": "^3.1.1",
     "multer": "^2.0.1",
     "mysql2": "^3.11.4",
+    "openai": "^7.4.0",
     "xlsx": "^0.18.5"
   }
 }
