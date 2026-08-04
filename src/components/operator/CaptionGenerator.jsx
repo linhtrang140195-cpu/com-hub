@@ -67,6 +67,7 @@ export default function CaptionGenerator() {
           campaign_id: campaign.id,
           post_type: postType,
           inputs,
+          date: post?.scheduled_at || new Date().toISOString(),
         });
       } else {
         output = generateTemplateCaption(postType, inputs, campaign);
@@ -91,6 +92,19 @@ export default function CaptionGenerator() {
   const handleCopy = async (field, text) => {
     const ok = await copyText(text);
     if (ok) { setCopiedField(field); setTimeout(() => setCopiedField(''), 2000); }
+  };
+
+  const [savedDraft, setSavedDraft] = useState(false);
+
+  const handleSaveDraft = async () => {
+    if (!post) return;
+    await api.patch(`/posts/${post.id}`, {
+      approval_status: 'cho_duyet',
+      seatalk_caption: result?.seatalk,
+      web_caption: result?.web,
+    });
+    setSavedDraft(true);
+    setTimeout(() => setSavedDraft(false), 2500);
   };
 
   const handleMarkPosted = async () => {
@@ -242,9 +256,14 @@ export default function CaptionGenerator() {
             </div>
           )}
           {post && (
-            <button onClick={handleMarkPosted} className="w-full bg-green-600 rounded-lg py-3 text-white text-sm font-bold cursor-pointer">
-              ✓ Đã đăng — lưu bài
-            </button>
+            <div className="flex gap-2">
+              <button onClick={handleSaveDraft} className="flex-1 bg-white border border-slate-200 rounded-lg py-3 text-slate-700 text-sm font-bold cursor-pointer">
+                {savedDraft ? '✓ Đã lưu, chờ duyệt' : '💾 Lưu nháp / Gửi duyệt'}
+              </button>
+              <button onClick={handleMarkPosted} className="flex-1 bg-green-600 rounded-lg py-3 text-white text-sm font-bold cursor-pointer">
+                ✓ Đã đăng — lưu bài
+              </button>
+            </div>
           )}
         </div>
       )}

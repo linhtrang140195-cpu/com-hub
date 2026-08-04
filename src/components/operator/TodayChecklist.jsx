@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { isToday, formatTimeVN } from '../../utils/datetime';
+import { getPostStatusInfo } from '../../utils/postStatus';
 import ProgressBar from '../shared/ProgressBar';
 import Badge from '../shared/Badge';
 
@@ -62,6 +63,7 @@ export default function TodayChecklist() {
         {!loading && posts.length === 0 && <div className="p-5 text-sm text-slate-400">Không có việc gì hôm nay 🎉</div>}
         {posts.map((p, i) => {
           const isDone = p.status === 'posted';
+          const statusInfo = getPostStatusInfo(p);
           return (
             <div key={p.id} className={`flex items-start gap-3.5 px-5 py-4 border-t border-slate-50 first:border-t-0 ${isDone ? 'bg-green-50/40' : ''}`}>
               <div
@@ -75,8 +77,12 @@ export default function TodayChecklist() {
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-sm font-medium ${isDone ? 'text-slate-400 line-through' : ''}`}>{p.title}</span>
                   <Badge label={p.post_type} color="#E94560" bg="#FEE2E2" />
+                  {!isDone && <Badge label={statusInfo.label} color={statusInfo.color} bg={statusInfo.bg} />}
                 </div>
-                <div className="text-[11px] text-slate-400">{(p.channels || []).join(', ')} · {formatTimeVN(p.scheduled_at)}</div>
+                <div className="text-[11px] text-slate-400">
+                  {(p.channels || []).join(', ')} · {formatTimeVN(p.scheduled_at)}
+                  {p.visual_template && <> · 🎨 {p.visual_template}</>}
+                </div>
               </div>
               {!isDone && (
                 <button

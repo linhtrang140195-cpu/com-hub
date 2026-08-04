@@ -13,7 +13,7 @@ const MODEL = 'claude-sonnet-4-6';
 
 // inputs có thể là field cụ thể (team_a, score...) HOẶC chỉ 1 field "context" tự do —
 // AI tự suy ra CTA + nội dung phù hợp post_type + tone campaign, operator không cần điền đủ hết.
-export async function generateCaption({ campaign, post_type, inputs, output_format = 'both' }) {
+export async function generateCaption({ campaign, post_type, inputs, output_format = 'both', tournamentContext = null }) {
   const c = getClient();
 
   const toneRules = Array.isArray(campaign.tone_rules)
@@ -33,7 +33,7 @@ ${toneRules ? '- ' + toneRules : '- (không rule đặc biệt)'}
 Operator có thể chỉ điền vài thông tin chính (thậm chí chỉ 1 câu context) —
 nếu thiếu CTA hoặc chi tiết, bạn TỰ suy luận CTA phù hợp loại bài + tone campaign,
 không cần hỏi lại.
-
+${tournamentContext ? `\n${tournamentContext}\n\nƯU TIÊN dùng data thật ở trên (tỉ số, đội, BXH) thay vì input operator nếu có mâu thuẫn — đây là nguồn chính xác nhất, lấy trực tiếp từ website giải đấu.\n` : ''}
 Bạn LUÔN LUÔN xuất RA đúng JSON hợp lệ với schema:
 {
   "seatalk": "caption ngắn có emoji, 3-6 dòng kèm CTA, đăng SeaTalk",

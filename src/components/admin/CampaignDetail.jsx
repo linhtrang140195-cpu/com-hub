@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { formatDateShort, formatDateVN, toDatetimeLocalValue, fromDatetimeLocalValue } from '../../utils/datetime';
+import { getPostStatusInfo } from '../../utils/postStatus';
 import Badge from '../shared/Badge';
 import UploadExcelModal from './UploadExcelModal';
 import VersionPanel from './VersionPanel';
@@ -64,6 +65,11 @@ export default function CampaignDetail() {
 
   const handleRemoveOperator = async (email) => {
     await api.delete(`/campaigns/${id}/assignments/${encodeURIComponent(email)}`);
+    load();
+  };
+
+  const handleApprove = async (postId) => {
+    await api.patch(`/posts/${postId}`, { approval_status: 'da_duyet' });
     load();
   };
 
@@ -183,17 +189,26 @@ export default function CampaignDetail() {
       {/* Posts tracking */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
         <div className="text-xs font-bold text-slate-400 tracking-wide mb-3.5">TRACKING BÀI ĐĂNG</div>
-        {posts.slice(0, 10).map(p => (
-          <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_90px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
-            <span className="font-medium">{p.title}</span>
-            <span className="text-slate-400">{formatDateShort(p.scheduled_at)}</span>
-            <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
-            <span className="text-slate-500">{p.status === 'posted' ? `${p.web_views} views` : '—'}</span>
-            <span className={p.status === 'posted' ? 'text-green-600 font-semibold' : 'text-slate-400'}>
-              {p.status === 'posted' ? 'Đã đăng ✅' : p.status === 'skipped' ? 'Bỏ qua' : 'Chưa đăng'}
-            </span>
-          </div>
-        ))}
+        {posts.slice(0, 10).map(p => {
+          const statusInfo = getPostStatusInfo(p);
+          return (
+            <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_90px_80px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
+              <div>
+                <div className="font-medium">{p.title}</div>
+                {p.visual_template && <div className="text-[10px] text-slate-400 mt-0.5">🎨 {p.visual_template}</div>}
+              </div>
+              <span className="text-slate-400">{formatDateShort(p.scheduled_at)}</span>
+              <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
+              <span className="text-slate-500">{p.status === 'posted' ? `${p.web_views} views` : '—'}</span>
+              <Badge label={statusInfo.label} color={statusInfo.color} bg={statusInfo.bg} />
+              {p.approval_status === 'cho_duyet' && p.status !== 'posted' ? (
+                <button onClick={() => handleApprove(p.id)} className="text-[11px] text-[#4A9EFF] font-bold cursor-pointer">
+                  Duyệt
+                </button>
+              ) : <span />}
+            </div>
+          );
+        })}
         {posts.length > 10 && <div className="text-xs text-slate-400 mt-2">+ {posts.length - 10} bài khác</div>}
       </div>
 
