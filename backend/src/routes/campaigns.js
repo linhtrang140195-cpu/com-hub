@@ -174,4 +174,9 @@ router.delete('/:id/assignments/:email', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+router.delete('/:id', requireAdmin, async (req, res) => {
+  await query("UPDATE campaigns SET status='archived' WHERE id=?", [req.params.id]);
+  res.json({ ok: true });
+});
+
 export default router;

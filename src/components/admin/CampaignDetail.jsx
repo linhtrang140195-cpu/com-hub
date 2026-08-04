@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { formatDateShort, formatDateVN, toDatetimeLocalValue, fromDatetimeLocalValue } from '../../utils/datetime';
 import { getPostStatusInfo } from '../../utils/postStatus';
@@ -9,6 +9,7 @@ import VersionPanel from './VersionPanel';
 
 export default function CampaignDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [campaign, setCampaign] = useState(null);
   const [posts, setPosts] = useState([]);
   const [editingPhase, setEditingPhase] = useState(null);
@@ -17,6 +18,9 @@ export default function CampaignDetail() {
   const [newOperatorEmail, setNewOperatorEmail] = useState('');
   const [operatorError, setOperatorError] = useState('');
   const [addingOperator, setAddingOperator] = useState(false);
+  const [seatalkText, setSeatalkText] = useState('');
+  const [seatalkLoading, setSeatalkLoading] = useState(false);
+  const [seatalkSent, setSeatalkSent] = useState('');
 
   const load = useCallback(async () => {
     const c = await api.get(`/campaigns/${id}`);
@@ -71,6 +75,35 @@ export default function CampaignDetail() {
   const handleApprove = async (postId) => {
     await api.patch(`/posts/${postId}`, { approval_status: 'da_duyet' });
     load();
+  };
+
+  const handleDeleteCampaign = async () => {
+    if (!window.confirm(`Xóa campaign "${campaign.name}"? Thao tác này không thể hoàn tác.`)) return;
+    await api.delete(`/campaigns/${id}`);
+    navigate('/admin/campaigns');
+  };
+
+  const handlePreviewSeatalk = async () => {
+    setSeatalkLoading(true);
+    try {
+      const { text } = await api.get('/seatalk/today-text');
+      setSeatalkText(text);
+    } finally {
+      setSeatalkLoading(false);
+    }
+  };
+
+  const handleSendSeatalk = async () => {
+    setSeatalkLoading(true);
+    setSeatalkSent('');
+    try {
+      const result = await api.post('/seatalk/send-reminder', {});
+      setSeatalkSent(result.ok ? `✓ Đã gửi ${result.count} bài lên SeaTalk` : `⚠️ ${result.reason}`);
+    } catch (e) {
+      setSeatalkSent(`⚠️ ${e.message}`);
+    } finally {
+      setSeatalkLoading(false);
+    }
   };
 
   return (
@@ -196,6 +229,9 @@ export default function CampaignDetail() {
               <div>
                 <div className="font-medium">{p.title}</div>
                 {p.visual_template && <div className="text-[10px] text-slate-400 mt-0.5">🎨 {p.visual_template}</div>}
+                {p.image_url && (
+                  <a href={p.image_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline mt-0.5 block">🖼️ Link ảnh</a>
+                )}
               </div>
               <span className="text-slate-400">{formatDateShort(p.scheduled_at)}</span>
               <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
@@ -213,6 +249,56 @@ export default function CampaignDetail() {
       </div>
 
       <VersionPanel campaignId={id} onRollback={load} />
+
+      {/* SeaTalk daily reminder panel */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-bold text-slate-400 tracking-wide">📱 SEATALK NHẮC VIỆC</div>
+          <button
+            onClick={handlePreviewSeatalk}
+            disabled={seatalkLoading}
+            className="text-xs bg-slate-100 hover:bg-slate-200 rounded-md px-3 py-1.5 font-semibold cursor-pointer disabled:opacity-50"
+          >
+            {seatalkLoading ? 'Đang tải...' : '🔍 Xem lịch hôm nay'}
+          </button>
+        </div>
+        {seatalkText && (
+          <div className="bg-slate-50 rounded-lg p-3 mb-3 text-[12px] font-mono whitespace-pre-wrap text-slate-700 max-h-[220px] overflow-y-auto border border-slate-200">
+            {seatalkText}
+          </div>
+        )}
+        {seatalkText && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleSendSeatalk}
+              disabled={seatalkLoading}
+              className="bg-[#4CAF50] text-white text-xs font-bold rounded-lg px-4 py-2 cursor-pointer disabled:opacity-50"
+            >
+              ✓ Gửi lên SeaTalk
+            </button>
+            <button
+              onClick={() => setSeatalkText('')}
+              className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer px-2"
+            >
+              Hủy
+            </button>
+          </div>
+        )}
+        {seatalkSent && <div className="text-xs text-green-700 mt-2 font-medium">{seatalkSent}</div>}
+        <div className="text-[10px] text-slate-400 mt-2">Cron tự gửi mỗi ngày 08:00 ICT nếu có SEATALK_WEBHOOK_URL. Nhấn "Xem lịch hôm nay" để review trước khi gửi thủ công.</div>
+      </div>
+
+      {/* Danger zone: delete campaign */}
+      <div className="bg-white rounded-xl border border-red-100 p-5 mb-5">
+        <div className="text-xs font-bold text-red-400 tracking-wide mb-3">VÙNG NGUY HIỂM</div>
+        <button
+          onClick={handleDeleteCampaign}
+          className="text-xs text-red-600 border border-red-200 hover:bg-red-50 rounded-lg px-4 py-2 font-semibold cursor-pointer"
+        >
+          🗑️ Xóa campaign này
+        </button>
+        <div className="text-[10px] text-slate-400 mt-1.5">Campaign sẽ bị ẩn khỏi danh sách (soft-delete, không xóa dữ liệu).</div>
+      </div>
 
       {showUpload && (
         <UploadExcelModal campaignId={id} onClose={() => setShowUpload(false)} onMerged={() => { setShowUpload(false); load(); }} />

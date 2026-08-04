@@ -2,6 +2,7 @@ import 'dotenv/config';
 import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
+import cron from 'node-cron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -24,6 +25,8 @@ import captionRoutes from './routes/caption.js';
 import versionRoutes from './routes/versions.js';
 import excelRoutes from './routes/excel.js';
 import reportRoutes from './routes/reports.js';
+import seatalkRoutes from './routes/seatalk.js';
+import { sendWebhookReminder } from './services/seatalkReminder.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -48,6 +51,7 @@ app.use('/api/caption', captionRoutes);
 app.use('/api/versions', versionRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/seatalk', seatalkRoutes);
 
 // Serve the built frontend (single container — no CORS needed in production)
 if (fs.existsSync(PUBLIC_DIR)) {
@@ -70,6 +74,16 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`[server] Comms Hub backend on :${PORT}`);
   });
+
+  // Daily reminder at 08:00 ICT — sends to SEATALK_WEBHOOK_URL if configured
+  cron.schedule('0 8 * * *', async () => {
+    try {
+      const result = await sendWebhookReminder();
+      console.log('[seatalk-cron]', result);
+    } catch (e) {
+      console.error('[seatalk-cron] error', e.message);
+    }
+  }, { timezone: 'Asia/Ho_Chi_Minh' });
 }
 
 start().catch(e => {

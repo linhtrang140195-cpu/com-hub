@@ -104,6 +104,7 @@ export default function CaptionGenerator() {
       approval_status: 'cho_duyet',
       seatalk_caption: result?.seatalk,
       web_caption: result?.web,
+      image_url: inputs.image_url || undefined,
     });
     setSavedDraft(true);
     setTimeout(() => setSavedDraft(false), 2500);
@@ -115,6 +116,7 @@ export default function CaptionGenerator() {
       status: 'posted',
       seatalk_caption: result?.seatalk,
       web_caption: result?.web,
+      image_url: inputs.image_url || undefined,
     });
     alert('Đã lưu bài đăng!');
   };
@@ -209,6 +211,15 @@ export default function CaptionGenerator() {
         <div className="mb-3">
           <div className="text-[11px] text-slate-400 mb-1.5">Tỷ số (optional)</div>
           <input value={inputs.score} onChange={e => setInputs(i => ({ ...i, score: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+        </div>
+        <div className="mb-3">
+          <div className="text-[11px] text-slate-400 mb-1.5">🖼️ Link ảnh / visual (Google Drive, Figma, ...)</div>
+          <input
+            value={inputs.image_url || ''}
+            onChange={e => setInputs(i => ({ ...i, image_url: e.target.value }))}
+            placeholder="https://drive.google.com/..."
+            className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none"
+          />
         </div>
         <div className="mb-5">
           <div className="text-[11px] text-slate-400 mb-1.5">Key moment / Context (1 câu — AI sẽ tự sinh CTA + content nếu bạn không điền đủ)</div>

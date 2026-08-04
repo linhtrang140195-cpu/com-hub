@@ -77,7 +77,7 @@ router.post('/', requireAdmin, async (req, res) => {
 router.patch('/:id', requireAuth, requireCampaignAccess(campaignIdFromPost), async (req, res) => {
   const plainFields = ['post_type', 'title', 'description', 'caption_hint', 'seatalk_caption',
     'web_caption', 'visual_template', 'operator_email', 'status', 'approval_status',
-    'st_seen', 'st_react', 'st_reply', 'web_views', 'sailor_views', 'live_link', 'notes', 'phase_id'];
+    'st_seen', 'st_react', 'st_reply', 'web_views', 'sailor_views', 'live_link', 'image_url', 'brief_design', 'notes', 'phase_id'];
   const sets = [];
   const values = [];
   for (const f of plainFields) {
