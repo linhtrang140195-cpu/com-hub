@@ -52,7 +52,7 @@ export default function LoginPage() {
         </form>
 
         <div className="text-[11px] text-slate-400 mt-5 text-center">
-          Chưa có quyền truy cập? Liên hệ Trang (IC Lead)
+          Chưa có quyền truy cập? Liên hệ Trang (IC)
         </div>
       </div>
     </div>

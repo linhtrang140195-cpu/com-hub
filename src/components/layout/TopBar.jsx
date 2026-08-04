@@ -30,7 +30,7 @@ export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaig
       </div>
 
       <div className="flex items-center gap-2.5">
-        <span className="text-xs text-slate-400">{user?.name} ({user?.role === 'admin' ? 'IC Lead' : 'Operator'})</span>
+        <span className="text-xs text-slate-400">{user?.name} ({user?.role === 'admin' ? 'IC' : 'Operator'})</span>
         <div
           className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[13px] font-bold text-white cursor-pointer"
           style={{ background: user?.role === 'admin' ? '#C8A84B' : '#E94560' }}

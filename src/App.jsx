@@ -38,6 +38,7 @@ function AppRoutes() {
         <Route path="/admin/reports/:campaignId" element={<ProtectedRoute role="admin"><CampaignReport /></ProtectedRoute>} />
 
         {/* Operator */}
+        <Route path="/operator/timeline" element={<MasterTimeline />} />
         <Route path="/operator/today" element={<TodayChecklist />} />
         <Route path="/operator/write" element={<CaptionGenerator />} />
         <Route path="/operator/write/:postId" element={<CaptionGenerator />} />

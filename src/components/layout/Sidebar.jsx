@@ -9,6 +9,7 @@ const ADMIN_NAV = [
 ];
 
 const OPERATOR_NAV = [
+  { to: '/operator/timeline', icon: '📅', label: 'Timeline' },
   { to: '/operator/today', icon: '✅', label: 'Hôm nay' },
   { to: '/operator/write', icon: '✍️', label: 'Viết bài' },
   { to: '/operator/history', icon: '📋', label: 'Lịch sử đăng' },
@@ -67,7 +68,7 @@ export default function Sidebar({ campaigns = [], onNewCampaign, activeCampaignI
           ))}
 
           <div className="px-4 pt-5 pb-2 text-[10px] text-slate-400 font-bold tracking-widest">THAO TÁC CỦA TÔI</div>
-          {OPERATOR_NAV.map(item => <NavItem key={item.to} {...item} />)}
+          {OPERATOR_NAV.filter(item => item.to !== '/operator/timeline').map(item => <NavItem key={item.to} {...item} />)}
 
           <div className="mt-auto p-4">
             <button

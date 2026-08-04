@@ -1,12 +1,18 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useOutletContext } from 'react-router-dom';
+import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { generateTemplateCaption } from '../../utils/template';
 import { generateUTM, slugify } from '../../utils/utm';
 import { copyText } from '../../services/clipboard';
+import { formatDateShort, formatTimeVN } from '../../utils/datetime';
+
+const UPCOMING_WINDOW_DAYS = 2;
 
 export default function CaptionGenerator() {
   const { postId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { activeCampaign, campaigns } = useOutletContext();
   const [post, setPost] = useState(null);
   const [campaign, setCampaign] = useState(activeCampaign);
@@ -17,6 +23,17 @@ export default function CaptionGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copiedField, setCopiedField] = useState('');
+  const [upcoming, setUpcoming] = useState([]);
+  const [showFreeform, setShowFreeform] = useState(false);
+
+  useEffect(() => {
+    if (postId) return;
+    const now = new Date();
+    const to = new Date(now.getTime() + UPCOMING_WINDOW_DAYS * 86400000);
+    api.get(`/posts?operator=${user.email}&status=scheduled&from=${now.toISOString()}&to=${to.toISOString()}`)
+      .then(list => setUpcoming(list.sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))))
+      .catch(console.error);
+  }, [postId, user.email]);
 
   useEffect(() => {
     if (postId) {
@@ -88,10 +105,48 @@ export default function CaptionGenerator() {
 
   const postTypeOptions = campaignType?.post_types?.map(t => t.name) || ['Preview', 'Result+BXH', 'Highlight', 'Recap ngày', 'Announce'];
 
+  const showForm = Boolean(postId) || showFreeform || (upcoming.length === 0 && !postId);
+
   return (
     <div className="max-w-[640px]">
       <div className="text-[22px] font-extrabold mb-6">✍️ Viết bài</div>
 
+      {!postId && upcoming.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+          <div className="text-[11px] text-slate-400 font-bold mb-3 tracking-wide">
+            📌 BÀI SẮP TỚI ({UPCOMING_WINDOW_DAYS} NGÀY TỚI)
+          </div>
+          {upcoming.map(p => (
+            <div key={p.id} className="flex items-center justify-between gap-3 py-2.5 border-t border-slate-50 first:border-t-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: p.campaign_color }} />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{p.title}</div>
+                  <div className="text-[11px] text-slate-400">
+                    {p.campaign_name} · {formatDateShort(p.scheduled_at)} {formatTimeVN(p.scheduled_at)} · {(p.channels || []).join(', ')}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate(`/operator/write/${p.id}`)}
+                className="bg-[#E94560] rounded-md px-3 py-1.5 text-white text-[11px] font-bold cursor-pointer shrink-0"
+              >
+                Viết bài →
+              </button>
+            </div>
+          ))}
+          {!showFreeform && (
+            <button
+              onClick={() => setShowFreeform(true)}
+              className="text-xs text-slate-400 hover:text-slate-600 mt-3 cursor-pointer underline"
+            >
+              Hoặc viết tự do không theo lịch có sẵn →
+            </button>
+          )}
+        </div>
+      )}
+
+      {showForm && (
       <div className="bg-white rounded-xl border border-slate-200 p-6 mb-4">
         {!post && (
           <div className="mb-4">
@@ -159,6 +214,7 @@ export default function CaptionGenerator() {
           {loading ? 'Đang sinh...' : '✨ Sinh caption'}
         </button>
       </div>
+      )}
 
       {result && (
         <div className="space-y-3">

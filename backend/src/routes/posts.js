@@ -12,16 +12,16 @@ router.get('/', requireAuth, async (req, res) => {
 
   const clauses = [];
   const params = [];
-  if (campaign_id) { clauses.push(`campaign_id = ?`); params.push(campaign_id); }
-  if (from) { clauses.push(`scheduled_at >= ?`); params.push(new Date(from)); }
-  if (to) { clauses.push(`scheduled_at <= ?`); params.push(new Date(to)); }
-  if (operator) { clauses.push(`LOWER(operator_email) = LOWER(?)`); params.push(operator); }
-  if (status) { clauses.push(`status = ?`); params.push(status); }
+  if (campaign_id) { clauses.push(`p.campaign_id = ?`); params.push(campaign_id); }
+  if (from) { clauses.push(`p.scheduled_at >= ?`); params.push(new Date(from)); }
+  if (to) { clauses.push(`p.scheduled_at <= ?`); params.push(new Date(to)); }
+  if (operator) { clauses.push(`LOWER(p.operator_email) = LOWER(?)`); params.push(operator); }
+  if (status) { clauses.push(`p.status = ?`); params.push(status); }
 
   if (email) {
     const { rows: userRows } = await query('SELECT role FROM users WHERE LOWER(email) = LOWER(?)', [email]);
     if (userRows[0]?.role === 'operator' && !operator) {
-      clauses.push(`(LOWER(operator_email) = LOWER(?) OR campaign_id IN (
+      clauses.push(`(LOWER(p.operator_email) = LOWER(?) OR p.campaign_id IN (
         SELECT campaign_id FROM campaign_assignments WHERE LOWER(user_email) = LOWER(?)
       ))`);
       params.push(email, email);
