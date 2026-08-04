@@ -106,10 +106,6 @@ CREATE TABLE IF NOT EXISTS campaign_versions (
   INDEX idx_versions_campaign (campaign_id)
 );
 
--- Migrations for columns added after initial schema
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS image_url VARCHAR(500) NULL AFTER live_link;
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS brief_design TEXT NULL AFTER image_url;
-
 CREATE TABLE IF NOT EXISTS report_cache (
   id            CHAR(36) PRIMARY KEY,
   scope         VARCHAR(32) NOT NULL,

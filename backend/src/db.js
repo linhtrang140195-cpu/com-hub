@@ -25,6 +25,28 @@ export async function initSchema() {
     conn.release();
   }
   console.log('[db] Schema initialised');
+  await runMigrations();
+}
+
+// Column-add migrations — ER_DUP_FIELDNAME means already applied, skip silently
+async function runMigrations() {
+  const migrations = [
+    { name: 'posts.image_url', sql: 'ALTER TABLE posts ADD COLUMN image_url VARCHAR(500) NULL AFTER live_link' },
+    { name: 'posts.brief_design', sql: 'ALTER TABLE posts ADD COLUMN brief_design TEXT NULL AFTER image_url' },
+  ];
+  const conn = await pool.getConnection();
+  try {
+    for (const m of migrations) {
+      try {
+        await conn.query(m.sql);
+        console.log(`[db] Migration applied: ${m.name}`);
+      } catch (e) {
+        if (e.code !== 'ER_DUP_FIELDNAME') throw e;
+      }
+    }
+  } finally {
+    conn.release();
+  }
 }
 
 // Thin wrapper matching the shape routes expect: { rows, rowCount }
