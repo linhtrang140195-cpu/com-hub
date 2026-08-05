@@ -3,20 +3,52 @@ import { api } from '../../services/api';
 import { slugify } from '../../utils/utm';
 
 const CHANNEL_OPTIONS = ['SeaTalk', 'Email', 'Web', 'Livestream'];
+const CONTENT_TYPE_OPTIONS = ['Ảnh static', 'Infographic', 'Video/Reel', 'Livestream', 'Text card', 'Event/Workshop offline', 'Minigame/Interactive'];
 
 export default function NewCampaignModal({ onClose, onCreated }) {
   const [types, setTypes] = useState([]);
   const [selectedType, setSelectedType] = useState(null);
   const [showNewType, setShowNewType] = useState(false);
   const [form, setForm] = useState({
-    name: '', start_date: '', end_date: '', website: '', operators: '', tone: '', slogan: '', channels: [],
+    name: '', start_date: '', end_date: '', website: '', operators: '', tone: '', slogan: '',
+    channels: [], concept: '', content_types: [],
   });
   const [phases, setPhases] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [aiPlan, setAiPlan] = useState(null);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
 
   // New type sub-form
   const [newType, setNewType] = useState({ label: '', phasesText: '', postTypesText: '' });
+
+  const handleGeneratePlan = async () => {
+    if (!selectedType || !form.name || !form.start_date || !form.end_date) {
+      setError('Cần điền tên, loại campaign và timeline trước khi gợi ý plan');
+      return;
+    }
+    setError('');
+    setGeneratingPlan(true);
+    try {
+      const plan = await api.post('/caption/generate-plan', {
+        name: form.name,
+        type: selectedType.key,
+        concept: form.concept,
+        content_types: form.content_types,
+        channels: form.channels,
+        tone: form.tone,
+        start_date: form.start_date,
+        end_date: form.end_date,
+      });
+      setAiPlan(plan);
+      // Apply tone suggestion if tone is empty
+      if (!form.tone && plan.tone_suggestion) setForm(f => ({ ...f, tone: plan.tone_suggestion }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
 
   useEffect(() => {
     api.get('/campaign-types').then(setTypes).catch(console.error);
@@ -158,6 +190,43 @@ export default function NewCampaignModal({ onClose, onCreated }) {
               </div>
             ))}
 
+            {/* Concept */}
+            <div className="mb-3.5">
+              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">CONCEPT / BRIEF (optional)</div>
+              <textarea
+                placeholder="Mô tả ngắn về campaign: mục tiêu, đặc điểm nổi bật, điều muốn truyền tải..."
+                value={form.concept}
+                onChange={e => setForm(f => ({ ...f, concept: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-[13px] outline-none h-[72px] resize-none"
+              />
+            </div>
+
+            {/* Content types */}
+            <div className="mb-4">
+              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">DẠNG CONTENT (chọn tất cả áp dụng)</div>
+              <div className="flex gap-2 flex-wrap">
+                {CONTENT_TYPE_OPTIONS.map(ct => (
+                  <button
+                    key={ct}
+                    type="button"
+                    onClick={() => setForm(f => ({
+                      ...f, content_types: f.content_types.includes(ct)
+                        ? f.content_types.filter(x => x !== ct)
+                        : [...f.content_types, ct],
+                    }))}
+                    className="rounded-full px-3 py-1.5 text-xs cursor-pointer"
+                    style={{
+                      background: form.content_types.includes(ct) ? '#1A1A2E' : '#F0F0F5',
+                      color: form.content_types.includes(ct) ? '#fff' : '#555',
+                      fontWeight: form.content_types.includes(ct) ? 700 : 400,
+                    }}
+                  >
+                    {ct}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="mb-3.5">
               <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">TIMELINE</div>
               <div className="flex gap-2 items-center">
@@ -202,6 +271,65 @@ export default function NewCampaignModal({ onClose, onCreated }) {
               </div>
             )}
           </>
+        )}
+
+        {/* AI Plan Generation */}
+        {selectedType && form.name && form.start_date && form.end_date && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={handleGeneratePlan}
+              disabled={generatingPlan}
+              className="w-full border-2 border-dashed border-[#E94560] rounded-lg py-2.5 text-[13px] text-[#E94560] font-bold cursor-pointer disabled:opacity-50 hover:bg-red-50"
+            >
+              {generatingPlan ? '⏳ AI đang lên plan...' : '✨ AI gợi ý plan tự động'}
+            </button>
+
+            {aiPlan && (
+              <div className="mt-3 bg-slate-50 rounded-xl border border-slate-200 p-4">
+                <div className="text-[11px] font-bold text-slate-400 tracking-wide mb-2">PLAN AI GỢI Ý</div>
+                {aiPlan.summary && <p className="text-xs text-slate-600 mb-3 italic">{aiPlan.summary}</p>}
+
+                {/* Phases */}
+                {aiPlan.phases?.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-[10px] font-bold text-slate-400 mb-1.5">GIAI ĐOẠN ĐỀ XUẤT</div>
+                    <div className="flex flex-col gap-1">
+                      {aiPlan.phases.map((ph, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs">
+                          <span className="w-4 h-4 rounded-full bg-[#1A1A2E] text-white flex items-center justify-center text-[9px] shrink-0 mt-0.5">{i+1}</span>
+                          <div>
+                            <span className="font-semibold">{ph.name}</span>
+                            <span className="text-slate-400 ml-1">({ph.duration_pct}%)</span>
+                            {ph.purpose && <div className="text-slate-500 text-[11px]">{ph.purpose}</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Suggested posts */}
+                {aiPlan.suggested_posts?.length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 mb-1.5">BÀI ĐĂNG GỢI Ý ({aiPlan.suggested_posts.length} bài)</div>
+                    <div className="max-h-[200px] overflow-y-auto flex flex-col gap-1.5">
+                      {aiPlan.suggested_posts.map((p, i) => (
+                        <div key={i} className="flex items-start gap-2 text-[11px] bg-white rounded-md border border-slate-100 px-2.5 py-1.5">
+                          <span className="text-slate-400 shrink-0 w-[32px]">+{p.days_from_start}d</span>
+                          <div className="min-w-0">
+                            <span className="font-medium">{p.title}</span>
+                            <span className="text-[#E94560] ml-1.5 text-[10px]">{p.post_type}</span>
+                            {p.note && <div className="text-slate-400 text-[10px] mt-0.5">{p.note}</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {error && <div className="text-xs text-red-600 mb-3">{error}</div>}

@@ -9,6 +9,34 @@ import { formatDateShort, formatTimeVN } from '../../utils/datetime';
 
 const UPCOMING_WINDOW_DAYS = 2;
 
+// Fields shown per campaign type
+const FIELD_CONFIG = {
+  giai_dau: {
+    fields: ['team_a', 'team_b', 'score', 'match_round', 'key_moment', 'image_url', 'custom_prompt'],
+    labels: { team_a: 'Đội A', team_b: 'Đội B', score: 'Tỷ số', match_round: 'Vòng / Trận', key_moment: 'Key moment (1 câu)' },
+  },
+  lnd: {
+    fields: ['topic', 'speaker', 'key_moment', 'image_url', 'custom_prompt'],
+    labels: { topic: 'Chủ đề buổi học', speaker: 'Diễn giả / Facilitator', key_moment: 'Takeaway chính' },
+  },
+  van_hoa: {
+    fields: ['topic', 'key_moment', 'image_url', 'custom_prompt'],
+    labels: { topic: 'Chủ đề / Hoạt động', key_moment: 'Điểm nhấn nội dung' },
+  },
+  su_kien: {
+    fields: ['topic', 'key_moment', 'image_url', 'custom_prompt'],
+    labels: { topic: 'Tên sự kiện / Hoạt động', key_moment: 'Thông tin chính' },
+  },
+};
+const DEFAULT_FIELD_CONFIG = {
+  fields: ['topic', 'key_moment', 'image_url', 'custom_prompt'],
+  labels: { topic: 'Chủ đề', key_moment: 'Nội dung chính' },
+};
+
+function getFieldConfig(campaignTypeKey) {
+  return FIELD_CONFIG[campaignTypeKey] || DEFAULT_FIELD_CONFIG;
+}
+
 export default function CaptionGenerator() {
   const { postId } = useParams();
   const navigate = useNavigate();
@@ -207,47 +235,93 @@ export default function CaptionGenerator() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <div className="text-[11px] text-slate-400 mb-1.5">Đội A / Chủ đề (optional)</div>
-            <input value={inputs.team_a} onChange={e => setInputs(i => ({ ...i, team_a: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
-          </div>
-          <div>
-            <div className="text-[11px] text-slate-400 mb-1.5">Đội B (optional)</div>
-            <input value={inputs.team_b} onChange={e => setInputs(i => ({ ...i, team_b: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
-          </div>
-        </div>
-        <div className="mb-3">
-          <div className="text-[11px] text-slate-400 mb-1.5">Tỷ số (optional)</div>
-          <input value={inputs.score} onChange={e => setInputs(i => ({ ...i, score: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
-        </div>
-        <div className="mb-3">
-          <div className="text-[11px] text-slate-400 mb-1.5">🖼️ Link ảnh / visual (Google Drive, Figma, ...)</div>
-          <input
-            value={inputs.image_url || ''}
-            onChange={e => setInputs(i => ({ ...i, image_url: e.target.value }))}
-            placeholder="https://drive.google.com/..."
-            className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none"
-          />
-        </div>
-        <div className="mb-5">
-          <div className="text-[11px] text-slate-400 mb-1.5">Key moment / Context (1 câu — AI sẽ tự sinh CTA + content nếu bạn không điền đủ)</div>
-          <textarea
-            value={inputs.context || inputs.key_moment}
-            onChange={e => setInputs(i => ({ ...i, key_moment: e.target.value, context: e.target.value }))}
-            placeholder="VD: Đội A lật ngược từ 0-1 lên 2-1..."
-            className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none h-[72px] resize-none"
-          />
-        </div>
-        <div className="mb-5">
-          <div className="text-[11px] text-slate-400 mb-1.5">Custom prompt (optional — chỉ dẫn tự do cho AI, sẽ ưu tiên hơn các ô trên)</div>
-          <textarea
-            value={inputs.custom_prompt}
-            onChange={e => setInputs(i => ({ ...i, custom_prompt: e.target.value }))}
-            placeholder="VD: Viết theo giọng hài hước, nhắc đến việc đây là trận derby..."
-            className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none h-[60px] resize-none"
-          />
-        </div>
+        {(() => {
+          const fc = getFieldConfig(campaign?.type);
+          const inp = (field) => inputs[field] || '';
+          const set = (field) => e => setInputs(i => ({ ...i, [field]: e.target.value }));
+          const lbl = (field) => fc.labels?.[field] || field;
+          const fields = fc.fields;
+
+          return (
+            <>
+              {/* Pair: team_a + team_b side by side */}
+              {fields.includes('team_a') && (
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <div className="text-[11px] text-slate-400 mb-1.5">{lbl('team_a')}</div>
+                    <input value={inp('team_a')} onChange={set('team_a')} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400 mb-1.5">{lbl('team_b')}</div>
+                    <input value={inp('team_b')} onChange={set('team_b')} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {/* score */}
+              {fields.includes('score') && (
+                <div className="mb-3">
+                  <div className="text-[11px] text-slate-400 mb-1.5">{lbl('score')} (optional)</div>
+                  <input value={inp('score')} onChange={set('score')} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                </div>
+              )}
+
+              {/* match_round */}
+              {fields.includes('match_round') && (
+                <div className="mb-3">
+                  <div className="text-[11px] text-slate-400 mb-1.5">{lbl('match_round')} (optional)</div>
+                  <input value={inp('match_round')} onChange={set('match_round')} placeholder="VD: Vòng bảng A — Ngày 2" className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                </div>
+              )}
+
+              {/* topic (non-tournament) */}
+              {fields.includes('topic') && (
+                <div className="mb-3">
+                  <div className="text-[11px] text-slate-400 mb-1.5">{lbl('topic')}</div>
+                  <input value={inp('topic')} onChange={set('topic')} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                </div>
+              )}
+
+              {/* speaker (lnd) */}
+              {fields.includes('speaker') && (
+                <div className="mb-3">
+                  <div className="text-[11px] text-slate-400 mb-1.5">{lbl('speaker')} (optional)</div>
+                  <input value={inp('speaker')} onChange={set('speaker')} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                </div>
+              )}
+
+              {/* image_url */}
+              {fields.includes('image_url') && (
+                <div className="mb-3">
+                  <div className="text-[11px] text-slate-400 mb-1.5">🖼️ Link ảnh / visual (Google Drive, Figma, ...)</div>
+                  <input value={inp('image_url')} onChange={set('image_url')} placeholder="https://drive.google.com/..." className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                </div>
+              )}
+
+              {/* key_moment */}
+              <div className="mb-5">
+                <div className="text-[11px] text-slate-400 mb-1.5">{lbl('key_moment')} (AI tự sinh CTA nếu bạn để trống)</div>
+                <textarea
+                  value={inp('key_moment')}
+                  onChange={e => setInputs(i => ({ ...i, key_moment: e.target.value, context: e.target.value }))}
+                  placeholder={fields.includes('team_a') ? 'VD: Đội A lật ngược từ 0-1 lên 2-1 phút 89...' : 'VD: 3 điều quan trọng nhất trong buổi hôm nay...'}
+                  className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none h-[72px] resize-none"
+                />
+              </div>
+
+              {/* custom_prompt */}
+              <div className="mb-5">
+                <div className="text-[11px] text-slate-400 mb-1.5">Custom prompt (optional — ưu tiên hơn các ô trên)</div>
+                <textarea
+                  value={inp('custom_prompt')}
+                  onChange={set('custom_prompt')}
+                  placeholder="VD: Viết theo giọng hài hước, nhắc đến đây là trận derby..."
+                  className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none h-[60px] resize-none"
+                />
+              </div>
+            </>
+          );
+        })()}
         <div className="mb-5">
           <div className="text-[11px] text-slate-400 mb-1.5">AI Provider</div>
           <div className="flex gap-2">
