@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "echo 'frontend pre-built in backend/public'",
+    "build": "vite build --outDir backend/public --emptyOutDir",
     "lint": "oxlint",
     "preview": "cd backend && npm install && node src/index.js"
   },

@@ -1,9 +1,20 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaign }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleCampaignClick = (c) => {
+    onSelectCampaign?.(c);
+    if (user?.role === 'admin') {
+      navigate(`/admin/campaigns/${c.id}`);
+    } else {
+      // Operator: stay on current subpage but switch campaign context
+      navigate('/operator/write');
+    }
+  };
   const activeCampaigns = campaigns.filter(c => c.status === 'active');
 
   return (
@@ -15,7 +26,7 @@ export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaig
           {activeCampaigns.map(c => (
             <div
               key={c.id}
-              onClick={() => onSelectCampaign?.(c)}
+              onClick={() => handleCampaignClick(c)}
               className="flex items-center gap-1.5 rounded px-2.5 py-1 cursor-pointer border"
               style={{
                 background: 'rgba(255,255,255,0.06)',

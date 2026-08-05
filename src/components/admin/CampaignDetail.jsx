@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { formatDateShort, formatDateVN, toDatetimeLocalValue, fromDatetimeLocalValue } from '../../utils/datetime';
@@ -6,6 +6,59 @@ import { getPostStatusInfo } from '../../utils/postStatus';
 import Badge from '../shared/Badge';
 import UploadExcelModal from './UploadExcelModal';
 import VersionPanel from './VersionPanel';
+
+const STATUS_OPTIONS = [
+  { label: 'Chưa viết', patch: { status: 'scheduled', approval_status: 'draft' }, color: '#94a3b8', bg: '#f1f5f9' },
+  { label: 'Chờ duyệt', patch: { approval_status: 'cho_duyet' }, color: '#f59e0b', bg: '#fffbeb' },
+  { label: 'Đã duyệt', patch: { approval_status: 'da_duyet' }, color: '#3b82f6', bg: '#eff6ff' },
+  { label: 'Đã đăng', patch: { status: 'posted' }, color: '#22c55e', bg: '#f0fdf4' },
+];
+
+function StatusDropdown({ post, onChanged }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  const statusInfo = getPostStatusInfo(post);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const handleSelect = async (opt) => {
+    setOpen(false);
+    await api.patch(`/posts/${post.id}`, opt.patch);
+    onChanged();
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold cursor-pointer"
+        style={{ background: statusInfo.bg, color: statusInfo.color }}
+      >
+        {statusInfo.label}
+        <span className="text-[9px] opacity-60">▾</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[110px] py-1 overflow-hidden">
+          {STATUS_OPTIONS.map(opt => (
+            <button
+              key={opt.label}
+              onClick={() => handleSelect(opt)}
+              className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-slate-50 cursor-pointer"
+              style={{ color: opt.color, fontWeight: opt.label === statusInfo.label ? 700 : 400 }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CampaignDetail() {
   const { id } = useParams();
@@ -69,11 +122,6 @@ export default function CampaignDetail() {
 
   const handleRemoveOperator = async (email) => {
     await api.delete(`/campaigns/${id}/assignments/${encodeURIComponent(email)}`);
-    load();
-  };
-
-  const handleApprove = async (postId) => {
-    await api.patch(`/posts/${postId}`, { approval_status: 'da_duyet' });
     load();
   };
 
@@ -222,29 +270,21 @@ export default function CampaignDetail() {
       {/* Posts tracking */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
         <div className="text-xs font-bold text-slate-400 tracking-wide mb-3.5">TRACKING BÀI ĐĂNG</div>
-        {posts.slice(0, 10).map(p => {
-          const statusInfo = getPostStatusInfo(p);
-          return (
-            <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_90px_80px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
-              <div>
-                <div className="font-medium">{p.title}</div>
-                {p.visual_template && <div className="text-[10px] text-slate-400 mt-0.5">🎨 {p.visual_template}</div>}
-                {p.image_url && (
-                  <a href={p.image_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline mt-0.5 block">🖼️ Link ảnh</a>
-                )}
-              </div>
-              <span className="text-slate-400">{formatDateShort(p.scheduled_at)}</span>
-              <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
-              <span className="text-slate-500">{p.status === 'posted' ? `${p.web_views} views` : '—'}</span>
-              <Badge label={statusInfo.label} color={statusInfo.color} bg={statusInfo.bg} />
-              {p.approval_status === 'cho_duyet' && p.status !== 'posted' ? (
-                <button onClick={() => handleApprove(p.id)} className="text-[11px] text-[#4A9EFF] font-bold cursor-pointer">
-                  Duyệt
-                </button>
-              ) : <span />}
+        {posts.slice(0, 10).map(p => (
+          <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_100px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
+            <div>
+              <div className="font-medium">{p.title}</div>
+              {p.visual_template && <div className="text-[10px] text-slate-400 mt-0.5">🎨 {p.visual_template}</div>}
+              {p.image_url && (
+                <a href={p.image_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline mt-0.5 block">🖼️ Link ảnh</a>
+              )}
             </div>
-          );
-        })}
+            <span className="text-slate-400">{formatDateShort(p.scheduled_at)}</span>
+            <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
+            <span className="text-slate-500">{p.status === 'posted' ? `${p.web_views} views` : '—'}</span>
+            <StatusDropdown post={p} onChanged={load} />
+          </div>
+        ))}
         {posts.length > 10 && <div className="text-xs text-slate-400 mt-2">+ {posts.length - 10} bài khác</div>}
       </div>
 

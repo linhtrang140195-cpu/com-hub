@@ -47,6 +47,15 @@ export default function CaptionGenerator() {
     }
   }, [postId]);
 
+  // Sync when user switches campaign tab in TopBar
+  useEffect(() => {
+    if (!postId && activeCampaign) {
+      setCampaign(activeCampaign);
+      setPostType('');
+      setResult(null);
+    }
+  }, [activeCampaign?.id, postId]);
+
   useEffect(() => {
     const c = post ? { type: post.campaign_type } : campaign;
     if (c?.type) {
