@@ -54,6 +54,7 @@ export default function CaptionGenerator() {
   const [copiedField, setCopiedField] = useState('');
   const [upcoming, setUpcoming] = useState([]);
   const [showFreeform, setShowFreeform] = useState(false);
+  const [teams, setTeams] = useState([]);
 
   useEffect(() => {
     if (postId) return;
@@ -83,6 +84,16 @@ export default function CaptionGenerator() {
       setResult(null);
     }
   }, [activeCampaign?.id, postId]);
+
+  // Load teams for tournament campaigns
+  useEffect(() => {
+    const c = post ? { id: post.campaign_id, type: post.campaign_type } : campaign;
+    if (c?.id && c?.type === 'giai_dau') {
+      api.get(`/tournaments/${c.id}/teams`).then(setTeams).catch(() => setTeams([]));
+    } else {
+      setTeams([]);
+    }
+  }, [campaign?.id, campaign?.type, post?.campaign_id]);
 
   useEffect(() => {
     const c = post ? { type: post.campaign_type } : campaign;
@@ -244,17 +255,31 @@ export default function CaptionGenerator() {
 
           return (
             <>
-              {/* Pair: team_a + team_b side by side */}
+              {/* Pair: team_a + team_b — dropdown if teams imported, else freetext */}
               {fields.includes('team_a') && (
                 <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <div className="text-[11px] text-slate-400 mb-1.5">{lbl('team_a')}</div>
-                    <input value={inp('team_a')} onChange={set('team_a')} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400 mb-1.5">{lbl('team_b')}</div>
-                    <input value={inp('team_b')} onChange={set('team_b')} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
-                  </div>
+                  {['team_a', 'team_b'].map(field => (
+                    <div key={field}>
+                      <div className="text-[11px] text-slate-400 mb-1.5">{lbl(field)}</div>
+                      {teams.length > 0 ? (
+                        <select
+                          value={inp(field)}
+                          onChange={e => {
+                            const name = e.target.value;
+                            setInputs(i => ({ ...i, [field]: name }));
+                          }}
+                          className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none bg-white"
+                        >
+                          <option value="">-- Chọn đội --</option>
+                          {teams.map(t => (
+                            <option key={t.id} value={t.name}>{t.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input value={inp(field)} onChange={set(field)} className="w-full border border-slate-200 rounded-lg px-3.5 py-2 text-[13px] outline-none" />
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 

@@ -6,6 +6,7 @@ import { getPostStatusInfo } from '../../utils/postStatus';
 import Badge from '../shared/Badge';
 import UploadExcelModal from './UploadExcelModal';
 import VersionPanel from './VersionPanel';
+import TournamentPanel from './TournamentPanel';
 
 const STATUS_OPTIONS = [
   { label: 'Chưa viết', patch: { status: 'scheduled', approval_status: 'draft' }, color: '#94a3b8', bg: '#f1f5f9' },
@@ -287,6 +288,8 @@ export default function CampaignDetail() {
         ))}
         {posts.length > 10 && <div className="text-xs text-slate-400 mt-2">+ {posts.length - 10} bài khác</div>}
       </div>
+
+      {campaign.type === 'giai_dau' && <TournamentPanel campaignId={id} />}
 
       <VersionPanel campaignId={id} onRollback={load} />
 

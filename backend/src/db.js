@@ -33,6 +33,31 @@ async function runMigrations() {
   const migrations = [
     { name: 'posts.image_url', sql: 'ALTER TABLE posts ADD COLUMN image_url VARCHAR(500) NULL AFTER live_link' },
     { name: 'posts.brief_design', sql: 'ALTER TABLE posts ADD COLUMN brief_design TEXT NULL AFTER image_url' },
+    { name: 'tournament_teams', sql: `CREATE TABLE IF NOT EXISTS tournament_teams (
+      id CHAR(36) PRIMARY KEY,
+      campaign_id CHAR(36) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      logo_url VARCHAR(500),
+      group_name VARCHAR(64),
+      external_id VARCHAR(128),
+      is_active BOOLEAN DEFAULT true,
+      INDEX idx_tt_campaign (campaign_id)
+    )` },
+    { name: 'tournament_matches', sql: `CREATE TABLE IF NOT EXISTS tournament_matches (
+      id CHAR(36) PRIMARY KEY,
+      campaign_id CHAR(36) NOT NULL,
+      match_date DATETIME,
+      round_name VARCHAR(255),
+      team_a_id CHAR(36),
+      team_b_id CHAR(36),
+      score_a INT,
+      score_b INT,
+      status VARCHAR(32) DEFAULT 'scheduled',
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_tm_campaign (campaign_id),
+      INDEX idx_tm_date (match_date)
+    )` },
   ];
   const conn = await pool.getConnection();
   try {
