@@ -4,7 +4,10 @@ export function getPostStatusInfo(post) {
     return { label: 'Đã đăng', color: '#fff', bg: '#4CAF50' };
   }
   if (post.status === 'skipped') {
-    return { label: 'Bỏ qua', color: '#555', bg: '#F0F0F5' };
+    return { label: 'Hủy', color: '#ef4444', bg: '#fef2f2' };
+  }
+  if (post.status === 'pending') {
+    return { label: 'Pending', color: '#a855f7', bg: '#faf5ff' };
   }
   if (post.approval_status === 'da_duyet') {
     return { label: 'Đã duyệt', color: '#fff', bg: '#4A9EFF' };

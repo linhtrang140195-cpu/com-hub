@@ -17,9 +17,11 @@ const PRIORITY_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { label: 'Chưa viết', patch: { status: 'scheduled', approval_status: 'draft' }, color: '#94a3b8', bg: '#f1f5f9' },
+  { label: 'Pending', patch: { status: 'pending' }, color: '#a855f7', bg: '#faf5ff' },
   { label: 'Chờ duyệt', patch: { approval_status: 'cho_duyet' }, color: '#f59e0b', bg: '#fffbeb' },
   { label: 'Đã duyệt', patch: { approval_status: 'da_duyet' }, color: '#3b82f6', bg: '#eff6ff' },
   { label: 'Đã đăng', patch: { status: 'posted' }, color: '#22c55e', bg: '#f0fdf4' },
+  { label: 'Hủy', patch: { status: 'skipped' }, color: '#ef4444', bg: '#fef2f2' },
 ];
 
 function StatusDropdown({ post, onChanged }) {
@@ -130,6 +132,12 @@ export default function CampaignDetail() {
 
   const handleRemoveOperator = async (email) => {
     await api.delete(`/campaigns/${id}/assignments/${encodeURIComponent(email)}`);
+    load();
+  };
+
+  const handleDeletePost = async (post) => {
+    if (!window.confirm(`Xoá bài "${post.title}"? Thao tác này không thể hoàn tác.`)) return;
+    await api.delete(`/posts/${post.id}`);
     load();
   };
 
@@ -290,11 +298,12 @@ export default function CampaignDetail() {
         {operatorError && <div className="text-xs text-red-600 mt-2">{operatorError}</div>}
       </div>
 
-      {/* Posts tracking */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-        <div className="text-xs font-bold text-slate-400 tracking-wide mb-3.5">TRACKING BÀI ĐĂNG</div>
-        {posts.slice(0, 10).map(p => (
-          <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_100px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
+      {/* Posts tracking — split content posts from internal design-brief tasks so they don't get mixed together */}
+      {(() => {
+        const briefPosts = posts.filter(p => p.post_type === 'BRIEF');
+        const contentPosts = posts.filter(p => p.post_type !== 'BRIEF');
+        const renderRow = (p) => (
+          <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_100px_24px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
             <div>
               <div className="font-medium">{p.title}</div>
               {p.visual_template && <div className="text-[10px] text-slate-400 mt-0.5">🎨 {p.visual_template}</div>}
@@ -306,10 +315,33 @@ export default function CampaignDetail() {
             <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
             <span className="text-slate-500">{p.status === 'posted' ? `${p.web_views} views` : '—'}</span>
             <StatusDropdown post={p} onChanged={load} />
+            <button
+              onClick={() => handleDeletePost(p)}
+              title="Xoá bài này"
+              className="w-5 h-5 rounded-full text-slate-300 hover:text-red-500 hover:bg-red-50 text-xs cursor-pointer"
+            >
+              🗑
+            </button>
           </div>
-        ))}
-        {posts.length > 10 && <div className="text-xs text-slate-400 mt-2">+ {posts.length - 10} bài khác</div>}
-      </div>
+        );
+        return (
+          <>
+            <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+              <div className="text-xs font-bold text-slate-400 tracking-wide mb-3.5">📝 NỘI DUNG ({contentPosts.length})</div>
+              {contentPosts.slice(0, 10).map(renderRow)}
+              {contentPosts.length > 10 && <div className="text-xs text-slate-400 mt-2">+ {contentPosts.length - 10} bài khác</div>}
+              {contentPosts.length === 0 && <div className="text-xs text-slate-400">Chưa có nội dung nào.</div>}
+            </div>
+            {briefPosts.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+                <div className="text-xs font-bold text-slate-400 tracking-wide mb-3.5">📐 BRIEF THIẾT KẾ ({briefPosts.length})</div>
+                {briefPosts.slice(0, 10).map(renderRow)}
+                {briefPosts.length > 10 && <div className="text-xs text-slate-400 mt-2">+ {briefPosts.length - 10} brief khác</div>}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {campaign.type === 'giai_dau' && <TournamentPanel campaignId={id} />}
 
