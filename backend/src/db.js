@@ -60,7 +60,7 @@ async function runMigrations() {
     )` },
     { name: 'campaigns.priority', sql: `ALTER TABLE campaigns ADD COLUMN priority VARCHAR(16) NOT NULL DEFAULT 'medium' AFTER status` },
     { name: 'monthly_reflections', sql: `CREATE TABLE IF NOT EXISTS monthly_reflections (
-      year_month VARCHAR(7) PRIMARY KEY,
+      \`year_month\` VARCHAR(7) PRIMARY KEY,
       what_worked TEXT,
       what_failed TEXT,
       why_text TEXT,
