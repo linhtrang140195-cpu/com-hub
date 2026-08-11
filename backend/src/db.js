@@ -78,7 +78,9 @@ async function runMigrations() {
         await conn.query(m.sql);
         console.log(`[db] Migration applied: ${m.name}`);
       } catch (e) {
-        if (e.code !== 'ER_DUP_FIELDNAME') throw e;
+        // ER_DUP_FIELDNAME (re-run ADD COLUMN) / ER_DUP_KEYNAME (re-run CREATE INDEX) both just
+        // mean this migration already applied on a previous deploy — safe to skip.
+        if (e.code !== 'ER_DUP_FIELDNAME' && e.code !== 'ER_DUP_KEYNAME') throw e;
       }
     }
   } finally {
