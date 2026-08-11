@@ -87,12 +87,71 @@ router.post('/merge', async (req, res) => {
   }
 });
 
+// Normalize a header cell for matching: lowercase, strip diacritics, collapse whitespace.
+function normalizeHeader(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Accepted header text per logical column — exact match after normalization, not substring,
+// so e.g. "Nội dung" never accidentally matches a "Tên bài" alias.
+const HEADER_ALIASES = {
+  num: ['stt', 'so', 'no', '#'],
+  ngay: ['ngay', 'date'],
+  gio: ['gio', 'time', 'gio dang'],
+  ten: ['ten bai', 'tieu de', 'title', 'ten'],
+  loai: ['loai', 'loai bai', 'type'],
+  kenh: ['kenh', 'channel'],
+  noiDung: ['noi dung', 'content', 'mo ta'],
+  caption: ['caption'],
+  visual: ['visual', 'hinh anh', 'design'],
+  pic: ['pic', 'phu trach', 'nguoi phu trach', 'owner'],
+  source: ['source', 'link', 'tai lieu'],
+};
+
+// Map each logical field to a column index by matching the header row's text — robust to
+// sheets whose column order doesn't match the original AOV template (this broke silently
+// before: a differently-ordered DCVP sheet got read positionally and every field landed in
+// the wrong column with no error).
+function detectColumns(headerRow) {
+  const normalized = (headerRow || []).map(normalizeHeader);
+  const cols = {};
+  for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+    const idx = normalized.findIndex(h => aliases.includes(h));
+    if (idx !== -1) cols[field] = idx;
+  }
+  return cols;
+}
+
 function parseContentCalendar(rows) {
   const posts = [];
   const yearDefault = 2026;
-  for (const row of rows) {
+  const cols = detectColumns(rows[0]);
+  const required = ['num', 'ngay', 'ten'];
+  const missing = required.filter(f => cols[f] === undefined);
+  if (missing.length) {
+    throw new Error(
+      `Không nhận diện được cột: ${missing.join(', ')}. ` +
+      `Dòng đầu file cần có tiêu đề rõ ràng (VD: STT, Ngày, Tên bài, Loại, Kênh, Nội dung, Caption, Visual, PIC, Source).`
+    );
+  }
+
+  for (const row of rows.slice(1)) {
     if (!Array.isArray(row)) continue;
-    const [num, ngay, gio, ten, loai, kenh, noiDung, caption, visual, pic, source] = row;
+    const num = row[cols.num];
+    const ngay = row[cols.ngay];
+    const gio = cols.gio !== undefined ? row[cols.gio] : null;
+    const ten = row[cols.ten];
+    const loai = cols.loai !== undefined ? row[cols.loai] : null;
+    const kenh = cols.kenh !== undefined ? row[cols.kenh] : null;
+    const noiDung = cols.noiDung !== undefined ? row[cols.noiDung] : null;
+    const caption = cols.caption !== undefined ? row[cols.caption] : null;
+    const visual = cols.visual !== undefined ? row[cols.visual] : null;
+    const pic = cols.pic !== undefined ? row[cols.pic] : null;
+    const source = cols.source !== undefined ? row[cols.source] : null;
     if (!num || !ngay || !ten || typeof ngay !== 'string' || !ngay.match(/\d/)) continue;
     if (String(num).startsWith('GIAI')) continue;
 
