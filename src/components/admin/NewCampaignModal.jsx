@@ -101,19 +101,26 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   const handleSubmit = async () => {
     setError('');
     if (!selectedType) { setError('Chọn loại campaign trước'); return; }
-    if (!form.name.trim() || !form.start_date || !form.end_date) { setError('Điền tên + timeline'); return; }
+    if (!form.name.trim()) { setError('Điền tên campaign'); return; }
+    if (mode === 'manual' && (!form.start_date || !form.end_date)) { setError('Điền timeline'); return; }
     setSubmitting(true);
     try {
+      // File mode: timeline is optional — if the plan has dates, no need to enter them here.
+      // Placeholder today→today+30, backfilled from the real post date range right after merge.
+      const today = new Date().toISOString().slice(0, 10);
+      const startDate = form.start_date || today;
+      const endDate = form.end_date || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+
       const phasesPayload = phases.map(p => ({
         name: p.name,
-        start_date: p.start ? `${p.start}T00:00:00+07:00` : form.start_date + 'T00:00:00+07:00',
-        end_date: p.end ? `${p.end}T23:59:59+07:00` : form.end_date + 'T23:59:59+07:00',
+        start_date: p.start ? `${p.start}T00:00:00+07:00` : startDate + 'T00:00:00+07:00',
+        end_date: p.end ? `${p.end}T23:59:59+07:00` : endDate + 'T23:59:59+07:00',
       }));
       const created = await api.post('/campaigns', {
         name: form.name.trim(),
         type: selectedType.key,
-        start_date: `${form.start_date}T00:00:00+07:00`,
-        end_date: `${form.end_date}T23:59:59+07:00`,
+        start_date: `${startDate}T00:00:00+07:00`,
+        end_date: `${endDate}T23:59:59+07:00`,
         website: form.website.trim() || null,
         channels: form.channels,
         tone: form.tone.trim() || null,
@@ -244,7 +251,26 @@ export default function NewCampaignModal({ onClose, onCreated }) {
           <UploadExcelModal
             campaignId={createdCampaign.id}
             onClose={() => setShowUpload(false)}
-            onMerged={() => { setShowUpload(false); onCreated?.(); }}
+            onMerged={async () => {
+              // Timeline wasn't required in file mode — derive it from the actual imported
+              // posts' date range instead of leaving the today→+30d placeholder.
+              if (!form.start_date || !form.end_date) {
+                try {
+                  const posts = await api.get(`/posts?campaign_id=${createdCampaign.id}`);
+                  if (posts.length) {
+                    const times = posts.map(p => new Date(p.scheduled_at).getTime());
+                    await api.patch(`/campaigns/${createdCampaign.id}`, {
+                      start_date: new Date(Math.min(...times)).toISOString(),
+                      end_date: new Date(Math.max(...times)).toISOString(),
+                    });
+                  }
+                } catch (e) {
+                  console.error('Failed to backfill campaign timeline', e);
+                }
+              }
+              setShowUpload(false);
+              onCreated?.();
+            }}
           />
         )}
       </div>
@@ -395,7 +421,9 @@ export default function NewCampaignModal({ onClose, onCreated }) {
             )}
 
             <div className="mb-3.5">
-              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">TIMELINE</div>
+              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">
+                TIMELINE{mode === 'file' && ' (optional — sẽ tự tính từ ngày trong file nếu để trống)'}
+              </div>
               <div className="flex gap-2 items-center">
                 <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] outline-none" />
                 <span className="text-slate-400">→</span>
