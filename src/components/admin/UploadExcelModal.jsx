@@ -51,7 +51,7 @@ export default function UploadExcelModal({ campaignId, onClose, onMerged }) {
               />
               <div className="text-[11px] mt-2">
                 Tool sẽ đọc sheet "Content Calendar" và parse ra danh sách bài.<br />
-                Cột theo thứ tự: STT, Ngày, <strong>Giờ</strong> (VD: 14:30 — để trống sẽ mặc định 09:00), Tên bài, Loại, Kênh, Nội dung, Caption, Visual, PIC.
+                Cột theo thứ tự: STT, Ngày, <strong>Giờ</strong> (VD: 14:30 — để trống sẽ mặc định 09:00), Tên bài, Loại, Kênh, Nội dung, Caption, Visual, PIC, <strong>Source</strong> (link Drive/ảnh/tài liệu — để trống nếu chưa có).
               </div>
             </div>
             {error && <div className="text-xs text-red-600 mb-3">{error}</div>}
@@ -71,14 +71,33 @@ export default function UploadExcelModal({ campaignId, onClose, onMerged }) {
         {preview && (
           <>
             <div className="text-sm mb-3">Tìm thấy <strong>{preview.length}</strong> bài trong file. Bài đã đăng (status=posted) sẽ được giữ nguyên, chỉ merge bài scheduled.</div>
-            <div className="max-h-[300px] overflow-auto border border-slate-100 rounded-lg mb-4">
-              {preview.map((p, i) => (
-                <div key={i} className="text-xs px-3 py-2 border-b border-slate-50 last:border-0">
-                  <span className="font-semibold">{p.title}</span>
-                  <span className="text-slate-400 ml-2">{p.post_type} · {p.scheduled_at?.slice(0, 10)}</span>
+            {(() => {
+              const briefRows = preview.filter(p => p.post_type === 'BRIEF');
+              const contentRows = preview.filter(p => p.post_type !== 'BRIEF');
+              const renderRow = (p, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 border-b border-slate-50 last:border-0">
+                  <span className="font-semibold flex-1 truncate">{p.title}</span>
+                  <span className="text-slate-400 shrink-0">{p.post_type} · {p.scheduled_at?.slice(0, 10)}</span>
+                  {p.image_url && (
+                    <a href={p.image_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-blue-500 shrink-0" title="Xem source">🔗</a>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+              return (
+                <div className="mb-4">
+                  <div className="max-h-[220px] overflow-auto border border-slate-100 rounded-lg mb-2">
+                    <div className="text-[10px] font-bold text-slate-400 px-3 py-1.5 bg-slate-50">📝 NỘI DUNG ({contentRows.length})</div>
+                    {contentRows.map(renderRow)}
+                  </div>
+                  {briefRows.length > 0 && (
+                    <div className="max-h-[160px] overflow-auto border border-slate-100 rounded-lg">
+                      <div className="text-[10px] font-bold text-slate-400 px-3 py-1.5 bg-slate-50">📐 BRIEF THIẾT KẾ ({briefRows.length})</div>
+                      {briefRows.map(renderRow)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {error && <div className="text-xs text-red-600 mb-3">{error}</div>}
             <div className="flex gap-2.5">
               <button

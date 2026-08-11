@@ -87,7 +87,7 @@ export default function CampaignDetail() {
   const [seatalkLoading, setSeatalkLoading] = useState(false);
   const [seatalkSent, setSeatalkSent] = useState('');
   const [showAddPost, setShowAddPost] = useState(false);
-  const BLANK_POST = { id: null, title: '', post_type: '', scheduled_at: '', channels: [], description: '', caption_hint: '' };
+  const BLANK_POST = { id: null, title: '', post_type: '', scheduled_at: '', channels: [], description: '', caption_hint: '', image_url: '' };
   const [newPost, setNewPost] = useState(BLANK_POST);
   const [addPostError, setAddPostError] = useState('');
 
@@ -150,6 +150,7 @@ export default function CampaignDetail() {
       channels: post.channels || [],
       description: post.description || '',
       caption_hint: post.caption_hint || '',
+      image_url: post.image_url || '',
     });
     setAddPostError('');
     setShowAddPost(true);
@@ -166,6 +167,7 @@ export default function CampaignDetail() {
       channels: newPost.channels,
       description: newPost.description.trim() || null,
       caption_hint: newPost.caption_hint.trim() || null,
+      image_url: newPost.image_url.trim() || null,
     };
     try {
       if (newPost.id) {
@@ -463,6 +465,15 @@ export default function CampaignDetail() {
                         className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs outline-none resize-none"
                       />
                     </div>
+                  </div>
+                  <div className="mb-2">
+                    <div className="text-[10px] text-slate-400 mb-1">Source (link Drive/ảnh/tài liệu)</div>
+                    <input
+                      value={newPost.image_url}
+                      onChange={e => setNewPost(p => ({ ...p, image_url: e.target.value }))}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs outline-none"
+                    />
                   </div>
                   <div className="flex gap-2 items-center">
                     <button onClick={handleSavePost} className="bg-[#1A1A2E] text-white text-xs font-bold rounded px-3 py-2 cursor-pointer">

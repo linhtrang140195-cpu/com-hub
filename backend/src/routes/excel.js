@@ -60,19 +60,19 @@ router.post('/merge', async (req, res) => {
       if (matchedId) {
         const [result] = await conn.query(
           `UPDATE posts SET scheduled_at=?, post_type=?, title=?, description=?, caption_hint=?,
-            channels=?, operator_email=?, external_id=COALESCE(external_id, ?) WHERE id=? AND status='scheduled'`,
+            channels=?, operator_email=?, visual_template=?, image_url=?, external_id=COALESCE(external_id, ?) WHERE id=? AND status='scheduled'`,
           [new Date(p.scheduled_at), p.post_type, p.title, p.description, p.caption_hint,
-           JSON.stringify(p.channels || []), p.operator_email || null, p.external_id || null, matchedId]
+           JSON.stringify(p.channels || []), p.operator_email || null, p.visual_template || null, p.image_url || null, p.external_id || null, matchedId]
         );
         if (result.affectedRows) updated++;
         else skipped++;
       } else {
         await conn.query(
           `INSERT INTO posts (id, campaign_id, external_id, scheduled_at, post_type, title, description, caption_hint,
-             channels, operator_email)
-           VALUES (?,?,?,?,?,?,?,?,?,?)`,
+             channels, operator_email, visual_template, image_url)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
           [newId(), campaign_id, p.external_id || null, new Date(p.scheduled_at), p.post_type, p.title, p.description || null,
-           p.caption_hint || null, JSON.stringify(p.channels || []), p.operator_email || null]
+           p.caption_hint || null, JSON.stringify(p.channels || []), p.operator_email || null, p.visual_template || null, p.image_url || null]
         );
         added++;
       }
@@ -92,7 +92,7 @@ function parseContentCalendar(rows) {
   const yearDefault = 2026;
   for (const row of rows) {
     if (!Array.isArray(row)) continue;
-    const [num, ngay, gio, ten, loai, kenh, noiDung, caption, visual, pic] = row;
+    const [num, ngay, gio, ten, loai, kenh, noiDung, caption, visual, pic, source] = row;
     if (!num || !ngay || !ten || typeof ngay !== 'string' || !ngay.match(/\d/)) continue;
     if (String(num).startsWith('GIAI')) continue;
 
@@ -119,6 +119,7 @@ function parseContentCalendar(rows) {
       description: noiDung ? String(noiDung).trim() : null,
       caption_hint: caption ? String(caption).trim() : null,
       visual_template: visual ? String(visual).trim() : null,
+      image_url: source ? String(source).trim() : null,
       channels,
       operator_email: pic === 'Bảo Ngọc' ? 'baongoc@garena.vn' : (pic === 'Trang' ? 'linhtrang.tran@garena.vn' : null),
     });
