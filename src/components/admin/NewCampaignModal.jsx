@@ -26,6 +26,8 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [createdCampaign, setCreatedCampaign] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [applyingPlan, setApplyingPlan] = useState(false);
+  const [applyPlanError, setApplyPlanError] = useState('');
 
   // New type sub-form
   const [newType, setNewType] = useState({ label: '', phasesText: '', postTypesText: '' });
@@ -127,23 +129,63 @@ export default function NewCampaignModal({ onClose, onCreated }) {
     }
   };
 
+  const handleApplyAiPlan = async () => {
+    setApplyPlanError('');
+    setApplyingPlan(true);
+    try {
+      const base = new Date(`${form.start_date}T09:00:00+07:00`).getTime();
+      for (const p of aiPlan.suggested_posts) {
+        await api.post('/posts', {
+          campaign_id: createdCampaign.id,
+          title: p.title,
+          post_type: p.post_type || 'POST',
+          scheduled_at: new Date(base + (p.days_from_start || 0) * 86400000).toISOString(),
+          description: p.note || null,
+          channels: form.channels,
+        });
+      }
+      onCreated?.();
+    } catch (e) {
+      setApplyPlanError(e.message);
+    } finally {
+      setApplyingPlan(false);
+    }
+  };
+
   if (createdCampaign) {
+    const hasAiPlan = aiPlan?.suggested_posts?.length > 0;
     return (
       <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center">
-        <div className="bg-white rounded-2xl p-8 w-[440px]">
+        <div className="bg-white rounded-2xl p-8 w-[460px]">
           <div className="text-lg font-extrabold mb-2">✓ Đã tạo "{createdCampaign.name}"</div>
-          <div className="text-sm text-slate-500 mb-5">Bạn có file Excel plan cho campaign này chưa? Upload ngay để tự động tạo lịch bài đăng, hoặc bỏ qua và thêm bài thủ công sau.</div>
-          <div className="flex gap-2.5">
-            <button
-              onClick={() => setShowUpload(true)}
-              className="flex-1 bg-[#1A1A2E] text-white rounded-lg py-3 text-sm font-bold cursor-pointer"
-            >
-              📎 Upload Excel plan
-            </button>
-            <button onClick={() => onCreated?.()} className="bg-slate-100 rounded-lg px-5 text-sm cursor-pointer">
-              Bỏ qua
-            </button>
+          <div className="text-sm text-slate-500 mb-5">
+            {hasAiPlan
+              ? `Áp dụng ${aiPlan.suggested_posts.length} bài từ plan AI đã gợi ý, upload file Excel plan sẵn có, hoặc bỏ qua và thêm bài thủ công sau.`
+              : 'Bạn có file Excel plan cho campaign này chưa? Upload ngay để tự động tạo lịch bài đăng, hoặc bỏ qua và thêm bài thủ công sau.'}
           </div>
+          <div className="flex flex-col gap-2">
+            {hasAiPlan && (
+              <button
+                onClick={handleApplyAiPlan}
+                disabled={applyingPlan}
+                className="bg-[#E94560] text-white rounded-lg py-3 text-sm font-bold cursor-pointer disabled:opacity-50"
+              >
+                {applyingPlan ? 'Đang tạo bài...' : `🤖 Áp dụng plan AI (${aiPlan.suggested_posts.length} bài)`}
+              </button>
+            )}
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setShowUpload(true)}
+                className="flex-1 bg-[#1A1A2E] text-white rounded-lg py-3 text-sm font-bold cursor-pointer"
+              >
+                📎 Upload Excel plan
+              </button>
+              <button onClick={() => onCreated?.()} className="bg-slate-100 rounded-lg px-5 text-sm cursor-pointer">
+                Bỏ qua
+              </button>
+            </div>
+          </div>
+          {applyPlanError && <div className="text-xs text-red-600 mt-3">{applyPlanError}</div>}
         </div>
         {showUpload && (
           <UploadExcelModal
