@@ -358,7 +358,8 @@ export default function NewCampaignModal({ onClose, onCreated }) {
                 placeholder="VD: AOV 2026 — Chiến Vực Giao Tranh"
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-[13px] outline-none"
+                className="w-full rounded-lg px-3.5 py-2.5 text-[13px] outline-none"
+                style={{ border: `1px solid ${error && !form.name.trim() ? '#ef4444' : '#E8E8EE'}` }}
               />
             </div>
 
@@ -553,7 +554,11 @@ export default function NewCampaignModal({ onClose, onCreated }) {
           </div>
         )}
 
-        {error && <div className="text-xs text-red-600 mb-3">{error}</div>}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-[13px] font-semibold rounded-lg px-3.5 py-2.5 mb-3">
+            ⚠️ {error}
+          </div>
+        )}
 
         <div className="flex gap-2.5">
           <button
