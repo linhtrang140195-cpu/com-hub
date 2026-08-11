@@ -46,12 +46,23 @@ router.post('/merge', async (req, res) => {
         if (existing.length) matchedId = existing[0].id;
       }
 
+      // Rows merged before external_id existed have it as NULL — fall back to an exact
+      // title match within the campaign so re-uploading an old plan (e.g. with real times
+      // filled in) still updates them in place instead of creating fresh duplicates.
+      if (!matchedId) {
+        const [existing] = await conn.query(
+          'SELECT id FROM posts WHERE campaign_id = ? AND external_id IS NULL AND title = ? AND status = \'scheduled\'',
+          [campaign_id, p.title]
+        );
+        if (existing.length === 1) matchedId = existing[0].id;
+      }
+
       if (matchedId) {
         const [result] = await conn.query(
           `UPDATE posts SET scheduled_at=?, post_type=?, title=?, description=?, caption_hint=?,
-            channels=?, operator_email=? WHERE id=? AND status='scheduled'`,
+            channels=?, operator_email=?, external_id=COALESCE(external_id, ?) WHERE id=? AND status='scheduled'`,
           [new Date(p.scheduled_at), p.post_type, p.title, p.description, p.caption_hint,
-           JSON.stringify(p.channels || []), p.operator_email || null, matchedId]
+           JSON.stringify(p.channels || []), p.operator_email || null, p.external_id || null, matchedId]
         );
         if (result.affectedRows) updated++;
         else skipped++;
