@@ -1,9 +1,15 @@
 // Detect posts on same channel within 30 minutes
 const CONFLICT_MINUTES = 30;
 
+// "BRIEF DESIGN: ..." rows are internal creative-brief tasks (assigned to a designer), not
+// content that actually publishes to a channel — they should never register as a channel conflict.
+function isInternalTask(post) {
+  return /^brief design/i.test(post.title || '');
+}
+
 export function detectConflicts(posts) {
   const conflicts = [];
-  const sorted = [...posts].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+  const sorted = [...posts].filter(p => !isInternalTask(p)).sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
 
   for (let i = 0; i < sorted.length; i++) {
     for (let j = i + 1; j < sorted.length; j++) {
