@@ -87,7 +87,8 @@ export default function CampaignDetail() {
   const [seatalkLoading, setSeatalkLoading] = useState(false);
   const [seatalkSent, setSeatalkSent] = useState('');
   const [showAddPost, setShowAddPost] = useState(false);
-  const [newPost, setNewPost] = useState({ title: '', post_type: '', scheduled_at: '', channels: [] });
+  const BLANK_POST = { id: null, title: '', post_type: '', scheduled_at: '', channels: [], description: '', caption_hint: '' };
+  const [newPost, setNewPost] = useState(BLANK_POST);
   const [addPostError, setAddPostError] = useState('');
 
   const load = useCallback(async () => {
@@ -140,19 +141,39 @@ export default function CampaignDetail() {
     load();
   };
 
-  const handleAddPost = async () => {
+  const handleEditPost = (post) => {
+    setNewPost({
+      id: post.id,
+      title: post.title,
+      post_type: post.post_type === 'BRIEF' ? post.post_type : post.post_type,
+      scheduled_at: toDatetimeLocalValue(post.scheduled_at),
+      channels: post.channels || [],
+      description: post.description || '',
+      caption_hint: post.caption_hint || '',
+    });
+    setAddPostError('');
+    setShowAddPost(true);
+  };
+
+  const handleSavePost = async () => {
     setAddPostError('');
     if (!newPost.title.trim()) { setAddPostError('Cần nhập tên bài'); return; }
     if (!newPost.scheduled_at) { setAddPostError('Cần chọn ngày giờ đăng'); return; }
+    const body = {
+      title: newPost.title.trim(),
+      post_type: newPost.post_type.trim() || 'POST',
+      scheduled_at: fromDatetimeLocalValue(newPost.scheduled_at),
+      channels: newPost.channels,
+      description: newPost.description.trim() || null,
+      caption_hint: newPost.caption_hint.trim() || null,
+    };
     try {
-      await api.post('/posts', {
-        campaign_id: id,
-        title: newPost.title.trim(),
-        post_type: newPost.post_type.trim() || 'POST',
-        scheduled_at: fromDatetimeLocalValue(newPost.scheduled_at),
-        channels: newPost.channels,
-      });
-      setNewPost({ title: '', post_type: '', scheduled_at: '', channels: [] });
+      if (newPost.id) {
+        await api.patch(`/posts/${newPost.id}`, body);
+      } else {
+        await api.post('/posts', { ...body, campaign_id: id });
+      }
+      setNewPost(BLANK_POST);
       setShowAddPost(false);
       load();
     } catch (e) {
@@ -328,7 +349,7 @@ export default function CampaignDetail() {
         const briefPosts = posts.filter(p => p.post_type === 'BRIEF');
         const contentPosts = posts.filter(p => p.post_type !== 'BRIEF');
         const renderRow = (p) => (
-          <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_100px_24px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
+          <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_100px_24px_24px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
             <div>
               <div className="font-medium">{p.title}</div>
               {p.visual_template && <div className="text-[10px] text-slate-400 mt-0.5">🎨 {p.visual_template}</div>}
@@ -340,6 +361,13 @@ export default function CampaignDetail() {
             <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
             <span className="text-slate-500">{p.status === 'posted' ? `${p.web_views} views` : '—'}</span>
             <StatusDropdown post={p} onChanged={load} />
+            <button
+              onClick={() => handleEditPost(p)}
+              title="Sửa bài này"
+              className="w-5 h-5 rounded-full text-slate-300 hover:text-blue-500 hover:bg-blue-50 text-xs cursor-pointer"
+            >
+              ✏️
+            </button>
             <button
               onClick={() => handleDeletePost(p)}
               title="Xoá bài này"
@@ -355,69 +383,96 @@ export default function CampaignDetail() {
               <div className="flex items-center justify-between mb-3.5">
                 <div className="text-xs font-bold text-slate-400 tracking-wide">📝 NỘI DUNG ({contentPosts.length})</div>
                 <button
-                  onClick={() => setShowAddPost(v => !v)}
+                  onClick={() => { setNewPost(BLANK_POST); setAddPostError(''); setShowAddPost(v => !v); }}
                   className="text-xs bg-slate-100 hover:bg-slate-200 rounded-md px-3 py-1.5 font-semibold cursor-pointer"
                 >
                   + Thêm bài
                 </button>
               </div>
               {showAddPost && (
-                <div className="bg-slate-50 rounded-lg p-3 mb-3 flex flex-wrap gap-2 items-end">
-                  <div className="flex-1 min-w-[160px]">
-                    <div className="text-[10px] text-slate-400 mb-1">Tên bài</div>
-                    <input
-                      value={newPost.title}
-                      onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))}
-                      placeholder="VD: Preview vòng bảng"
-                      className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs outline-none"
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-400 mb-1">Loại</div>
-                    <input
-                      value={newPost.post_type}
-                      onChange={e => setNewPost(p => ({ ...p, post_type: e.target.value }))}
-                      placeholder="VD: Preview"
-                      className="border border-slate-200 rounded px-2 py-1.5 text-xs outline-none w-[110px]"
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-400 mb-1">Ngày giờ đăng</div>
-                    <input
-                      type="datetime-local"
-                      value={newPost.scheduled_at}
-                      onChange={e => setNewPost(p => ({ ...p, scheduled_at: e.target.value }))}
-                      className="border border-slate-200 rounded px-2 py-1.5 text-xs outline-none"
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-400 mb-1">Kênh</div>
-                    <div className="flex gap-1">
-                      {ADD_POST_CHANNEL_OPTIONS.map(ch => (
-                        <button
-                          key={ch}
-                          onClick={() => setNewPost(p => ({
-                            ...p, channels: p.channels.includes(ch) ? p.channels.filter(x => x !== ch) : [...p.channels, ch],
-                          }))}
-                          className="rounded-full px-2.5 py-1 text-[11px] cursor-pointer"
-                          style={{
-                            background: newPost.channels.includes(ch) ? '#E94560' : '#fff',
-                            color: newPost.channels.includes(ch) ? '#fff' : '#555',
-                            border: '1px solid #E8E8EE',
-                          }}
-                        >
-                          {ch}
-                        </button>
-                      ))}
+                <div className="bg-slate-50 rounded-lg p-3 mb-3">
+                  <div className="text-[10px] font-bold text-slate-400 mb-2">{newPost.id ? '✏️ SỬA BÀI' : '+ THÊM BÀI MỚI'}</div>
+                  <div className="flex flex-wrap gap-2 items-end mb-2">
+                    <div className="flex-1 min-w-[160px]">
+                      <div className="text-[10px] text-slate-400 mb-1">Tên bài</div>
+                      <input
+                        value={newPost.title}
+                        onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))}
+                        placeholder="VD: Preview vòng bảng"
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs outline-none"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400 mb-1">Loại</div>
+                      <input
+                        value={newPost.post_type}
+                        onChange={e => setNewPost(p => ({ ...p, post_type: e.target.value }))}
+                        placeholder="VD: Preview"
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs outline-none w-[110px]"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400 mb-1">Ngày giờ đăng</div>
+                      <input
+                        type="datetime-local"
+                        value={newPost.scheduled_at}
+                        onChange={e => setNewPost(p => ({ ...p, scheduled_at: e.target.value }))}
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs outline-none"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400 mb-1">Kênh</div>
+                      <div className="flex gap-1">
+                        {ADD_POST_CHANNEL_OPTIONS.map(ch => (
+                          <button
+                            key={ch}
+                            onClick={() => setNewPost(p => ({
+                              ...p, channels: p.channels.includes(ch) ? p.channels.filter(x => x !== ch) : [...p.channels, ch],
+                            }))}
+                            className="rounded-full px-2.5 py-1 text-[11px] cursor-pointer"
+                            style={{
+                              background: newPost.channels.includes(ch) ? '#E94560' : '#fff',
+                              color: newPost.channels.includes(ch) ? '#fff' : '#555',
+                              border: '1px solid #E8E8EE',
+                            }}
+                          >
+                            {ch}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <button onClick={handleAddPost} className="bg-[#1A1A2E] text-white text-xs font-bold rounded px-3 py-2 cursor-pointer">
-                    Lưu
-                  </button>
-                  <button onClick={() => setShowAddPost(false)} className="text-xs text-slate-400 cursor-pointer px-1">
-                    Huỷ
-                  </button>
-                  {addPostError && <div className="text-xs text-red-600 w-full">{addPostError}</div>}
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="text-[10px] text-slate-400 mb-1">Mô tả nội dung</div>
+                      <textarea
+                        value={newPost.description}
+                        onChange={e => setNewPost(p => ({ ...p, description: e.target.value }))}
+                        rows={2}
+                        placeholder="Ý tưởng, visual, ghi chú cho bài này..."
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs outline-none resize-none"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="text-[10px] text-slate-400 mb-1">Gợi ý caption</div>
+                      <textarea
+                        value={newPost.caption_hint}
+                        onChange={e => setNewPost(p => ({ ...p, caption_hint: e.target.value }))}
+                        rows={2}
+                        placeholder="Caption mẫu / hook..."
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs outline-none resize-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <button onClick={handleSavePost} className="bg-[#1A1A2E] text-white text-xs font-bold rounded px-3 py-2 cursor-pointer">
+                      Lưu
+                    </button>
+                    <button onClick={() => { setShowAddPost(false); setNewPost(BLANK_POST); }} className="text-xs text-slate-400 cursor-pointer px-1">
+                      Huỷ
+                    </button>
+                    {addPostError && <div className="text-xs text-red-600">{addPostError}</div>}
+                  </div>
                 </div>
               )}
               {contentPosts.slice(0, 10).map(renderRow)}
