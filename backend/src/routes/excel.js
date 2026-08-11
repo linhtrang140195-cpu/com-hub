@@ -81,7 +81,7 @@ function parseContentCalendar(rows) {
   const yearDefault = 2026;
   for (const row of rows) {
     if (!Array.isArray(row)) continue;
-    const [num, ngay, ten, loai, kenh, noiDung, caption, visual, pic] = row;
+    const [num, ngay, gio, ten, loai, kenh, noiDung, caption, visual, pic] = row;
     if (!num || !ngay || !ten || typeof ngay !== 'string' || !ngay.match(/\d/)) continue;
     if (String(num).startsWith('GIAI')) continue;
 
@@ -89,7 +89,13 @@ function parseContentCalendar(rows) {
     if (!dateMatch) continue;
     const day = dateMatch[1].padStart(2, '0');
     const month = dateMatch[2].padStart(2, '0');
-    const isoDate = `${yearDefault}-${month}-${day}T09:00:00+07:00`;
+
+    // "Giờ" column ("14:30", "9h", "9h30"...) — falls back to 09:00 when blank/unparseable so
+    // older sheets without this column still work.
+    const timeMatch = gio != null ? String(gio).match(/(\d{1,2})[:h](\d{2})?/) : null;
+    const hour = timeMatch ? timeMatch[1].padStart(2, '0') : '09';
+    const minute = timeMatch && timeMatch[2] ? timeMatch[2].padStart(2, '0') : '00';
+    const isoDate = `${yearDefault}-${month}-${day}T${hour}:${minute}:00+07:00`;
 
     const channelStr = String(kenh || 'SeaTalk');
     const channels = channelStr.split(/[+,\/]/).map(s => s.trim()).filter(Boolean);

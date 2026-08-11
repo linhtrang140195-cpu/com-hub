@@ -49,7 +49,10 @@ export default function UploadExcelModal({ campaignId, onClose, onMerged }) {
                 onChange={e => setFile(e.target.files[0])}
                 className="text-xs"
               />
-              <div className="text-[11px] mt-2">Tool sẽ đọc sheet "Content Calendar" và parse ra danh sách bài</div>
+              <div className="text-[11px] mt-2">
+                Tool sẽ đọc sheet "Content Calendar" và parse ra danh sách bài.<br />
+                Cột theo thứ tự: STT, Ngày, <strong>Giờ</strong> (VD: 14:30 — để trống sẽ mặc định 09:00), Tên bài, Loại, Kênh, Nội dung, Caption, Visual, PIC.
+              </div>
             </div>
             {error && <div className="text-xs text-red-600 mb-3">{error}</div>}
             <div className="flex gap-2.5">
