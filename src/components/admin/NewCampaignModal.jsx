@@ -12,6 +12,7 @@ const PRIORITY_OPTIONS = [
 const CONTENT_TYPE_OPTIONS = ['Ảnh static', 'Infographic', 'Video/Reel', 'Livestream', 'Text card', 'Event/Workshop offline', 'Minigame/Interactive'];
 
 export default function NewCampaignModal({ onClose, onCreated }) {
+  const [mode, setMode] = useState('manual'); // 'manual' | 'file'
   const [types, setTypes] = useState([]);
   const [selectedType, setSelectedType] = useState(null);
   const [showNewType, setShowNewType] = useState(false);
@@ -124,6 +125,7 @@ export default function NewCampaignModal({ onClose, onCreated }) {
         operators: form.operators.split(',').map(s => s.trim()).filter(Boolean),
       });
       setCreatedCampaign(created);
+      if (mode === 'file') setShowUpload(true);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -252,7 +254,26 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center" onClick={onClose}>
       <div className="bg-white rounded-2xl p-8 w-[560px] max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
-        <div className="text-lg font-extrabold mb-5">+ Tạo campaign mới</div>
+        <div className="text-lg font-extrabold mb-4">+ Tạo campaign mới</div>
+
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          <button
+            onClick={() => setMode('manual')}
+            className="rounded-lg px-3.5 py-3 text-[13px] font-bold cursor-pointer text-left"
+            style={{ background: mode === 'manual' ? '#1A1A2E' : '#F0F0F5', color: mode === 'manual' ? '#fff' : '#555' }}
+          >
+            ✍️ Tự điền chi tiết
+            <div className="text-[10px] font-normal opacity-70 mt-0.5">Điền brief, AI gợi ý plan</div>
+          </button>
+          <button
+            onClick={() => setMode('file')}
+            className="rounded-lg px-3.5 py-3 text-[13px] font-bold cursor-pointer text-left"
+            style={{ background: mode === 'file' ? '#E94560' : '#F0F0F5', color: mode === 'file' ? '#fff' : '#555' }}
+          >
+            📎 Upload file có sẵn
+            <div className="text-[10px] font-normal opacity-70 mt-0.5">Chỉ cần tên + timeline, rồi upload</div>
+          </button>
+        </div>
 
         <div className="mb-4">
           <div className="text-[11px] text-slate-400 font-bold mb-2 tracking-wide">LOẠI CAMPAIGN</div>
@@ -305,8 +326,17 @@ export default function NewCampaignModal({ onClose, onCreated }) {
 
         {selectedType && (
           <>
-            {[
-              ['Tên campaign', 'name', 'VD: AOV 2026 — Chiến Vực Giao Tranh'],
+            <div className="mb-3.5">
+              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">TÊN CAMPAIGN</div>
+              <input
+                placeholder="VD: AOV 2026 — Chiến Vực Giao Tranh"
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-[13px] outline-none"
+              />
+            </div>
+
+            {mode === 'manual' && [
               ['Website (optional)', 'website', 'VD: dcvp.run.ingarena.net'],
               ['Operator(s) — email, phân cách bởi dấu phẩy', 'operators', 'VD: baongoc@garena.vn'],
               ['Tone', 'tone', 'VD: máu lửa, hype, gần gũi'],
@@ -323,42 +353,46 @@ export default function NewCampaignModal({ onClose, onCreated }) {
               </div>
             ))}
 
-            {/* Concept */}
-            <div className="mb-3.5">
-              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">CONCEPT / BRIEF (optional)</div>
-              <textarea
-                placeholder="Mô tả ngắn về campaign: mục tiêu, đặc điểm nổi bật, điều muốn truyền tải..."
-                value={form.concept}
-                onChange={e => setForm(f => ({ ...f, concept: e.target.value }))}
-                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-[13px] outline-none h-[72px] resize-none"
-              />
-            </div>
+            {mode === 'manual' && (
+              <>
+                {/* Concept */}
+                <div className="mb-3.5">
+                  <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">CONCEPT / BRIEF (optional)</div>
+                  <textarea
+                    placeholder="Mô tả ngắn về campaign: mục tiêu, đặc điểm nổi bật, điều muốn truyền tải..."
+                    value={form.concept}
+                    onChange={e => setForm(f => ({ ...f, concept: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-[13px] outline-none h-[72px] resize-none"
+                  />
+                </div>
 
-            {/* Content types */}
-            <div className="mb-4">
-              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">DẠNG CONTENT (chọn tất cả áp dụng)</div>
-              <div className="flex gap-2 flex-wrap">
-                {CONTENT_TYPE_OPTIONS.map(ct => (
-                  <button
-                    key={ct}
-                    type="button"
-                    onClick={() => setForm(f => ({
-                      ...f, content_types: f.content_types.includes(ct)
-                        ? f.content_types.filter(x => x !== ct)
-                        : [...f.content_types, ct],
-                    }))}
-                    className="rounded-full px-3 py-1.5 text-xs cursor-pointer"
-                    style={{
-                      background: form.content_types.includes(ct) ? '#1A1A2E' : '#F0F0F5',
-                      color: form.content_types.includes(ct) ? '#fff' : '#555',
-                      fontWeight: form.content_types.includes(ct) ? 700 : 400,
-                    }}
-                  >
-                    {ct}
-                  </button>
-                ))}
-              </div>
-            </div>
+                {/* Content types */}
+                <div className="mb-4">
+                  <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">DẠNG CONTENT (chọn tất cả áp dụng)</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {CONTENT_TYPE_OPTIONS.map(ct => (
+                      <button
+                        key={ct}
+                        type="button"
+                        onClick={() => setForm(f => ({
+                          ...f, content_types: f.content_types.includes(ct)
+                            ? f.content_types.filter(x => x !== ct)
+                            : [...f.content_types, ct],
+                        }))}
+                        className="rounded-full px-3 py-1.5 text-xs cursor-pointer"
+                        style={{
+                          background: form.content_types.includes(ct) ? '#1A1A2E' : '#F0F0F5',
+                          color: form.content_types.includes(ct) ? '#fff' : '#555',
+                          fontWeight: form.content_types.includes(ct) ? 700 : 400,
+                        }}
+                      >
+                        {ct}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="mb-3.5">
               <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">TIMELINE</div>
@@ -411,7 +445,7 @@ export default function NewCampaignModal({ onClose, onCreated }) {
               </div>
             </div>
 
-            {phases.length > 0 && (
+            {mode === 'manual' && phases.length > 0 && (
               <div className="mb-4">
                 <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">GIAI ĐOẠN (điền ngày sau nếu muốn)</div>
                 {phases.map((p, i) => (
@@ -426,8 +460,14 @@ export default function NewCampaignModal({ onClose, onCreated }) {
           </>
         )}
 
+        {mode === 'file' && selectedType && (
+          <div className="mb-4 bg-slate-50 rounded-lg p-3 text-xs text-slate-500">
+            📎 Sau khi tạo campaign, màn hình upload Excel sẽ tự mở ra ngay.
+          </div>
+        )}
+
         {/* AI Plan Generation */}
-        {selectedType && form.name && form.start_date && form.end_date && (
+        {mode === 'manual' && selectedType && form.name && form.start_date && form.end_date && (
           <div className="mb-4">
             <button
               type="button"
