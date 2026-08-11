@@ -55,6 +55,44 @@ Sinh 8-15 bài gợi ý phù hợp với timeline và loại campaign. phases n�
   return parseJsonResponse(text, 'Claude');
 }
 
+// Fallback for Excel plan uploads whose header wording doesn't match the known alias list —
+// ask Claude to map each logical field to a column index by reading the header row itself.
+export async function detectExcelColumns(headerRow) {
+  const c = getClient();
+  const system = `Bạn là chuyên gia đọc file Excel content calendar cho team truyền thông.
+Nhiệm vụ: nhìn dòng tiêu đề cột của file, xác định index (bắt đầu từ 0) của từng field logic.
+Trả về JSON hợp lệ, KHÔNG có markdown code fence.`;
+
+  const user = `Dòng tiêu đề của file (index bắt đầu từ 0):
+${headerRow.map((h, i) => `${i}: ${JSON.stringify(h)}`).join('\n')}
+
+Xác định index cột tương ứng cho từng field sau (số nguyên, hoặc null nếu không có cột nào phù hợp):
+- num: số thứ tự dòng (STT)
+- ngay: ngày đăng bài
+- gio: giờ đăng bài (có thể không có, không bắt buộc)
+- ten: tên/tiêu đề bài viết
+- loai: loại bài (VD: POST, BRIEF, Announce, Preview...)
+- kenh: kênh đăng (SeaTalk, Email, Web...)
+- noiDung: nội dung/mô tả chi tiết bài viết
+- caption: caption mẫu / gợi ý caption
+- visual: mô tả visual/thiết kế cần làm
+- pic: người phụ trách (PIC / owner)
+- source: link tài liệu/ảnh/drive tham khảo
+
+Trả về đúng format JSON:
+{ "num": 0, "ngay": 1, "gio": null, "ten": 2, "loai": 3, "kenh": 4, "noiDung": 5, "caption": 6, "visual": 7, "pic": 8, "source": null }`;
+
+  const msg = await c.messages.create({
+    model: MODEL,
+    max_tokens: 500,
+    system,
+    messages: [{ role: 'user', content: user }],
+  });
+
+  const text = msg.content.map(b => b.text || '').join('').trim();
+  return parseJsonResponse(text, 'Claude');
+}
+
 export async function generateCaption({ campaign, post_type, inputs, output_format = 'both', tournamentContext = null }) {
   const c = getClient();
   const { system, user } = buildCaptionPrompt({ campaign, post_type, inputs, output_format, tournamentContext });

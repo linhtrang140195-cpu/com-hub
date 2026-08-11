@@ -3,6 +3,7 @@ import multer from 'multer';
 import * as XLSX from 'xlsx';
 import { query, pool, newId } from '../db.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { detectExcelColumns } from '../services/claude.js';
 
 const router = Router();
 router.use(requireAdmin);
@@ -16,7 +17,8 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     const sheet = wb.Sheets['Content Calendar'] || wb.Sheets[wb.SheetNames.find(n => n.toLowerCase().includes('content'))] || wb.Sheets[wb.SheetNames[0]];
     if (!sheet) return res.status(400).json({ error: 'Không tìm thấy sheet Content Calendar' });
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, header: 1 });
-    const posts = parseContentCalendar(rows);
+    const cols = await resolveColumns(rows[0]);
+    const posts = parseContentCalendar(rows, cols);
     res.json({ posts, total: posts.length });
   } catch (e) {
     console.error('[excel/preview]', e);
@@ -126,32 +128,52 @@ function detectColumns(headerRow) {
   return cols;
 }
 
-function parseContentCalendar(rows) {
-  const posts = [];
-  const yearDefault = 2026;
-  const cols = detectColumns(rows[0]);
-  const required = ['num', 'ngay', 'ten'];
-  const missing = required.filter(f => cols[f] === undefined);
+const REQUIRED_FIELDS = ['num', 'ngay', 'ten'];
+
+// Alias-matching is instant and free — try it first. Only fall back to asking Claude to read
+// the header row when a sheet's wording doesn't hit any known alias (e.g. a differently-built
+// template), so we don't spend an API call on every upload.
+async function resolveColumns(headerRow) {
+  let cols = detectColumns(headerRow);
+  let missing = REQUIRED_FIELDS.filter(f => cols[f] === undefined);
+  if (!missing.length) return cols;
+
+  try {
+    const aiCols = await detectExcelColumns(headerRow || []);
+    // AI mapping fills in whatever the alias pass couldn't find; alias hits still win where
+    // both agree, since they're deterministic and already proven exact-header matches.
+    cols = { ...aiCols, ...cols };
+  } catch (e) {
+    console.error('[excel] AI column detection failed', e.message);
+  }
+
+  missing = REQUIRED_FIELDS.filter(f => cols[f] === undefined || cols[f] === null);
   if (missing.length) {
     throw new Error(
       `Không nhận diện được cột: ${missing.join(', ')}. ` +
       `Dòng đầu file cần có tiêu đề rõ ràng (VD: STT, Ngày, Tên bài, Loại, Kênh, Nội dung, Caption, Visual, PIC, Source).`
     );
   }
+  return cols;
+}
+
+function parseContentCalendar(rows, cols) {
+  const posts = [];
+  const yearDefault = 2026;
 
   for (const row of rows.slice(1)) {
     if (!Array.isArray(row)) continue;
     const num = row[cols.num];
     const ngay = row[cols.ngay];
-    const gio = cols.gio !== undefined ? row[cols.gio] : null;
+    const gio = cols.gio != null ? row[cols.gio] : null;
     const ten = row[cols.ten];
-    const loai = cols.loai !== undefined ? row[cols.loai] : null;
-    const kenh = cols.kenh !== undefined ? row[cols.kenh] : null;
-    const noiDung = cols.noiDung !== undefined ? row[cols.noiDung] : null;
-    const caption = cols.caption !== undefined ? row[cols.caption] : null;
-    const visual = cols.visual !== undefined ? row[cols.visual] : null;
-    const pic = cols.pic !== undefined ? row[cols.pic] : null;
-    const source = cols.source !== undefined ? row[cols.source] : null;
+    const loai = cols.loai != null ? row[cols.loai] : null;
+    const kenh = cols.kenh != null ? row[cols.kenh] : null;
+    const noiDung = cols.noiDung != null ? row[cols.noiDung] : null;
+    const caption = cols.caption != null ? row[cols.caption] : null;
+    const visual = cols.visual != null ? row[cols.visual] : null;
+    const pic = cols.pic != null ? row[cols.pic] : null;
+    const source = cols.source != null ? row[cols.source] : null;
     if (!num || !ngay || !ten || typeof ngay !== 'string' || !ngay.match(/\d/)) continue;
     if (String(num).startsWith('GIAI')) continue;
 
