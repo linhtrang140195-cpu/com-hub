@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { slugify } from '../../utils/utm';
+import UploadExcelModal from './UploadExcelModal';
 
 const CHANNEL_OPTIONS = ['SeaTalk', 'Email', 'Web', 'Livestream'];
 const PRIORITY_OPTIONS = [
@@ -23,6 +24,8 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   const [error, setError] = useState('');
   const [aiPlan, setAiPlan] = useState(null);
   const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [createdCampaign, setCreatedCampaign] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
 
   // New type sub-form
   const [newType, setNewType] = useState({ label: '', phasesText: '', postTypesText: '' });
@@ -101,7 +104,7 @@ export default function NewCampaignModal({ onClose, onCreated }) {
         start_date: p.start ? `${p.start}T00:00:00+07:00` : form.start_date + 'T00:00:00+07:00',
         end_date: p.end ? `${p.end}T23:59:59+07:00` : form.end_date + 'T23:59:59+07:00',
       }));
-      await api.post('/campaigns', {
+      const created = await api.post('/campaigns', {
         name: form.name.trim(),
         type: selectedType.key,
         start_date: `${form.start_date}T00:00:00+07:00`,
@@ -116,13 +119,42 @@ export default function NewCampaignModal({ onClose, onCreated }) {
         phases: phasesPayload,
         operators: form.operators.split(',').map(s => s.trim()).filter(Boolean),
       });
-      onCreated?.();
+      setCreatedCampaign(created);
     } catch (e) {
       setError(e.message);
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (createdCampaign) {
+    return (
+      <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center">
+        <div className="bg-white rounded-2xl p-8 w-[440px]">
+          <div className="text-lg font-extrabold mb-2">✓ Đã tạo "{createdCampaign.name}"</div>
+          <div className="text-sm text-slate-500 mb-5">Bạn có file Excel plan cho campaign này chưa? Upload ngay để tự động tạo lịch bài đăng, hoặc bỏ qua và thêm bài thủ công sau.</div>
+          <div className="flex gap-2.5">
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex-1 bg-[#1A1A2E] text-white rounded-lg py-3 text-sm font-bold cursor-pointer"
+            >
+              📎 Upload Excel plan
+            </button>
+            <button onClick={() => onCreated?.()} className="bg-slate-100 rounded-lg px-5 text-sm cursor-pointer">
+              Bỏ qua
+            </button>
+          </div>
+        </div>
+        {showUpload && (
+          <UploadExcelModal
+            campaignId={createdCampaign.id}
+            onClose={() => setShowUpload(false)}
+            onMerged={() => { setShowUpload(false); onCreated?.(); }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center" onClick={onClose}>
