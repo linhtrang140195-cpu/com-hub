@@ -97,6 +97,23 @@ router.get('/year/:year', async (req, res) => {
     [from, to]
   );
   const posted = posts.filter(p => p.status === 'posted');
+
+  const quarters = [1, 2, 3, 4].map(q => {
+    const qPosts = posts.filter(p => {
+      const d = new Date(p.posted_at || p.scheduled_at);
+      return Math.floor(d.getUTCMonth() / 3) + 1 === q;
+    });
+    const qPosted = qPosts.filter(p => p.status === 'posted');
+    const totalReact = qPosted.reduce((a, p) => a + (p.st_react || 0), 0);
+    return {
+      q,
+      total_posts: qPosts.length,
+      posted: qPosted.length,
+      total_react: totalReact,
+      avg_react: qPosted.length ? Math.round(totalReact / qPosted.length) : 0,
+    };
+  });
+
   res.json({
     year,
     total_campaigns: campaigns.length,
@@ -106,6 +123,7 @@ router.get('/year/:year', async (req, res) => {
     total_posted: posted.length,
     total_react: posted.reduce((a, p) => a + (p.st_react || 0), 0),
     avg_react_per_post: posted.length ? Math.round(posted.reduce((a, p) => a + (p.st_react || 0), 0) / posted.length) : 0,
+    quarters,
     campaigns: campaigns.map(c => ({ id: c.id, name: c.name, type: c.type, status: c.status })),
   });
 });

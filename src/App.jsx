@@ -3,11 +3,13 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import Layout from './components/layout/Layout';
 import MasterTimeline from './components/admin/MasterTimeline';
+import MasterCalendar from './components/admin/MasterCalendar';
 import CampaignList from './components/admin/CampaignList';
 import CampaignDetail from './components/admin/CampaignDetail';
 import Archive from './components/admin/Archive';
 import CampaignReport from './components/reports/CampaignReport';
 import YearlyReport from './components/reports/YearlyReport';
+import BenchmarkReport from './components/reports/BenchmarkReport';
 import TodayChecklist from './components/operator/TodayChecklist';
 import CaptionGenerator from './components/operator/CaptionGenerator';
 import PostHistory from './components/operator/PostHistory';
@@ -31,10 +33,12 @@ function AppRoutes() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         {/* Admin */}
         <Route path="/admin/timeline" element={<ProtectedRoute role="admin"><MasterTimeline /></ProtectedRoute>} />
+        <Route path="/admin/calendar" element={<ProtectedRoute role="admin"><MasterCalendar /></ProtectedRoute>} />
         <Route path="/admin/campaigns" element={<ProtectedRoute role="admin"><CampaignList /></ProtectedRoute>} />
         <Route path="/admin/campaigns/:id" element={<ProtectedRoute role="admin"><CampaignDetail /></ProtectedRoute>} />
         <Route path="/admin/archive" element={<ProtectedRoute role="admin"><Archive /></ProtectedRoute>} />
         <Route path="/admin/reports" element={<ProtectedRoute role="admin"><YearlyReport /></ProtectedRoute>} />
+        <Route path="/admin/reports/benchmark" element={<ProtectedRoute role="admin"><BenchmarkReport /></ProtectedRoute>} />
         <Route path="/admin/reports/:campaignId" element={<ProtectedRoute role="admin"><CampaignReport /></ProtectedRoute>} />
 
         {/* Operator */}

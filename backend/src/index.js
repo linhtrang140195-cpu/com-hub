@@ -27,6 +27,7 @@ import excelRoutes from './routes/excel.js';
 import reportRoutes from './routes/reports.js';
 import seatalkRoutes from './routes/seatalk.js';
 import tournamentRoutes from './routes/tournament.js';
+import reflectionRoutes from './routes/reflections.js';
 import { sendWebhookReminder } from './services/seatalkReminder.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 
@@ -55,6 +56,7 @@ app.use('/api/excel', excelRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/seatalk', seatalkRoutes);
 app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/reflections', reflectionRoutes);
 
 // Serve the built frontend (single container — no CORS needed in production)
 if (fs.existsSync(PUBLIC_DIR)) {

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const ADMIN_NAV = [
   { to: '/admin/timeline', icon: '📅', label: 'Master Timeline' },
+  { to: '/admin/calendar', icon: '🗓️', label: 'Master Calendar' },
   { to: '/admin/campaigns', icon: '🗂️', label: 'Tất cả campaigns' },
   { to: '/admin/reports', icon: '📊', label: 'Báo cáo' },
   { to: '/admin/archive', icon: '📦', label: 'Archive' },

@@ -79,13 +79,13 @@ router.post('/', requireAdmin, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const { name, type, start_date, end_date, website, channels, tone, slogan, color, tone_rules, phases, operators } = req.body;
+    const { name, type, start_date, end_date, website, channels, tone, slogan, color, tone_rules, priority, phases, operators } = req.body;
     const id = newId();
     await conn.query(
-      `INSERT INTO campaigns (id, name, type, start_date, end_date, website, channels, tone, slogan, color, tone_rules)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO campaigns (id, name, type, start_date, end_date, website, channels, tone, slogan, color, tone_rules, priority)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [id, name, type, new Date(start_date), new Date(end_date), website || null,
-       JSON.stringify(channels || []), tone || null, slogan || null, color || null, JSON.stringify(tone_rules || [])]
+       JSON.stringify(channels || []), tone || null, slogan || null, color || null, JSON.stringify(tone_rules || []), priority || 'medium']
     );
 
     if (Array.isArray(phases)) {
@@ -126,7 +126,7 @@ router.post('/', requireAdmin, async (req, res) => {
 });
 
 router.patch('/:id', requireAdmin, async (req, res) => {
-  const fields = ['name', 'type', 'status', 'website', 'tone', 'slogan', 'color'];
+  const fields = ['name', 'type', 'status', 'website', 'tone', 'slogan', 'color', 'priority'];
   const dateFields = ['start_date', 'end_date'];
   const sets = [];
   const values = [];

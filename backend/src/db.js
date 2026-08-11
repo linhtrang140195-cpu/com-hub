@@ -58,6 +58,16 @@ async function runMigrations() {
       INDEX idx_tm_campaign (campaign_id),
       INDEX idx_tm_date (match_date)
     )` },
+    { name: 'campaigns.priority', sql: `ALTER TABLE campaigns ADD COLUMN priority VARCHAR(16) NOT NULL DEFAULT 'medium' AFTER status` },
+    { name: 'monthly_reflections', sql: `CREATE TABLE IF NOT EXISTS monthly_reflections (
+      year_month VARCHAR(7) PRIMARY KEY,
+      what_worked TEXT,
+      what_failed TEXT,
+      why_text TEXT,
+      next_action TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      updated_by VARCHAR(255)
+    )` },
   ];
   const conn = await pool.getConnection();
   try {

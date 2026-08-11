@@ -3,6 +3,11 @@ import { api } from '../../services/api';
 import { slugify } from '../../utils/utm';
 
 const CHANNEL_OPTIONS = ['SeaTalk', 'Email', 'Web', 'Livestream'];
+const PRIORITY_OPTIONS = [
+  { key: 'high', label: 'Cao', color: '#E94560' },
+  { key: 'medium', label: 'Trung bình', color: '#f59e0b' },
+  { key: 'low', label: 'Thấp', color: '#94a3b8' },
+];
 const CONTENT_TYPE_OPTIONS = ['Ảnh static', 'Infographic', 'Video/Reel', 'Livestream', 'Text card', 'Event/Workshop offline', 'Minigame/Interactive'];
 
 export default function NewCampaignModal({ onClose, onCreated }) {
@@ -11,7 +16,7 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   const [showNewType, setShowNewType] = useState(false);
   const [form, setForm] = useState({
     name: '', start_date: '', end_date: '', website: '', operators: '', tone: '', slogan: '',
-    channels: [], concept: '', content_types: [],
+    channels: [], concept: '', content_types: [], priority: 'medium',
   });
   const [phases, setPhases] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -107,6 +112,7 @@ export default function NewCampaignModal({ onClose, onCreated }) {
         slogan: form.slogan.trim() || null,
         color: selectedType.color,
         tone_rules: selectedType.default_tone_rules || [],
+        priority: form.priority,
         phases: phasesPayload,
         operators: form.operators.split(',').map(s => s.trim()).filter(Boolean),
       });
@@ -235,6 +241,26 @@ export default function NewCampaignModal({ onClose, onCreated }) {
                 <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] outline-none" />
                 <span className="text-slate-400">→</span>
                 <input type="date" value={form.end_date} onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] outline-none" />
+              </div>
+            </div>
+
+            <div className="mb-3.5">
+              <div className="text-[11px] text-slate-400 font-bold mb-1.5 tracking-wide">ĐỘ ƯU TIÊN</div>
+              <div className="flex gap-2">
+                {PRIORITY_OPTIONS.map(p => (
+                  <button
+                    key={p.key}
+                    onClick={() => setForm(f => ({ ...f, priority: p.key }))}
+                    className="rounded-full px-3.5 py-1.5 text-xs cursor-pointer"
+                    style={{
+                      background: form.priority === p.key ? p.color : '#F0F0F5',
+                      color: form.priority === p.key ? '#fff' : '#555',
+                      fontWeight: form.priority === p.key ? 700 : 400,
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
               </div>
             </div>
 

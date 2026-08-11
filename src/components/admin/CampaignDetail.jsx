@@ -9,6 +9,12 @@ import VersionPanel from './VersionPanel';
 import TournamentPanel from './TournamentPanel';
 import EventMetricsPanel from './EventMetricsPanel';
 
+const PRIORITY_OPTIONS = [
+  { key: 'high', label: 'Cao' },
+  { key: 'medium', label: 'Trung bình' },
+  { key: 'low', label: 'Thấp' },
+];
+
 const STATUS_OPTIONS = [
   { label: 'Chưa viết', patch: { status: 'scheduled', approval_status: 'draft' }, color: '#94a3b8', bg: '#f1f5f9' },
   { label: 'Chờ duyệt', patch: { approval_status: 'cho_duyet' }, color: '#f59e0b', bg: '#fffbeb' },
@@ -127,6 +133,11 @@ export default function CampaignDetail() {
     load();
   };
 
+  const handlePriorityChange = async (priority) => {
+    await api.patch(`/campaigns/${id}`, { priority });
+    load();
+  };
+
   const handleDeleteCampaign = async () => {
     if (!window.confirm(`Xóa campaign "${campaign.name}"? Thao tác này không thể hoàn tác.`)) return;
     await api.delete(`/campaigns/${id}`);
@@ -185,6 +196,16 @@ export default function CampaignDetail() {
             <div className="text-[13px] font-semibold">{val}</div>
           </div>
         ))}
+        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3.5">
+          <div className="text-[10px] text-slate-400 mb-1 font-bold">Độ ưu tiên</div>
+          <select
+            value={campaign.priority || 'medium'}
+            onChange={e => handlePriorityChange(e.target.value)}
+            className="text-[13px] font-semibold border-none outline-none bg-transparent cursor-pointer -ml-1"
+          >
+            {PRIORITY_OPTIONS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Phases + reschedule */}
