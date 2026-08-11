@@ -111,11 +111,14 @@ export default function NewCampaignModal({ onClose, onCreated }) {
       const startDate = form.start_date || today;
       const endDate = form.end_date || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
 
-      const phasesPayload = phases.map(p => ({
+      // File mode hides the per-phase date editor (nothing meaningful to send yet), so
+      // skip creating phases entirely rather than inserting N phases that all collapse to
+      // the same placeholder range — admin can add real phases later if needed.
+      const phasesPayload = mode === 'manual' ? phases.map(p => ({
         name: p.name,
         start_date: p.start ? `${p.start}T00:00:00+07:00` : startDate + 'T00:00:00+07:00',
         end_date: p.end ? `${p.end}T23:59:59+07:00` : endDate + 'T23:59:59+07:00',
-      }));
+      })) : [];
       const created = await api.post('/campaigns', {
         name: form.name.trim(),
         type: selectedType.key,
