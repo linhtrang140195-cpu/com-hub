@@ -24,9 +24,9 @@ export default function Layout() {
 
   return (
     <div className="font-sans bg-slate-50 min-h-screen text-[#1e293b]">
-      <TopBar campaigns={campaigns} activeCampaign={activeCampaign} onSelectCampaign={setActiveCampaign} />
+      <TopBar campaigns={campaigns} activeCampaign={activeCampaign} onSelectCampaign={setActiveCampaign} onNewCampaign={() => setShowNewCampaign(true)} />
       <div className="flex min-h-[calc(100vh-52px)]">
-        <Sidebar campaigns={campaigns} onNewCampaign={() => setShowNewCampaign(true)} activeCampaignId={activeCampaign?.id} />
+        <Sidebar campaigns={campaigns} activeCampaignId={activeCampaign?.id} />
         <div className="flex-1 p-7 overflow-auto">
           <Outlet context={{ campaigns, activeCampaign, reloadCampaigns: loadCampaigns }} />
         </div>

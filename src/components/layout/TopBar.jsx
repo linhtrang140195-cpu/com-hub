@@ -61,7 +61,7 @@ function TypeGroup({ group, activeCampaign, onPick, open, onToggle }) {
   );
 }
 
-export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaign }) {
+export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaign, onNewCampaign }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [types, setTypes] = useState([]);
@@ -112,6 +112,14 @@ export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaig
 
       <div className="flex items-center gap-2.5">
         <span className="text-xs text-slate-400">{user?.name} ({user?.role === 'admin' ? 'IC' : 'Operator'})</span>
+        {user?.role === 'admin' && (
+          <button
+            onClick={onNewCampaign}
+            className="bg-[#E94560] hover:bg-[#d63951] text-white text-[11px] font-bold rounded-md px-3 py-1.5 cursor-pointer"
+          >
+            + Tạo campaign
+          </button>
+        )}
         <div
           className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[13px] font-bold text-white cursor-pointer"
           style={{ background: user?.role === 'admin' ? '#C8A84B' : '#E94560' }}

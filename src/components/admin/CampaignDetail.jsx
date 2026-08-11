@@ -9,6 +9,8 @@ import VersionPanel from './VersionPanel';
 import TournamentPanel from './TournamentPanel';
 import EventMetricsPanel from './EventMetricsPanel';
 
+const ADD_POST_CHANNEL_OPTIONS = ['SeaTalk', 'Email', 'Web', 'Livestream'];
+
 const PRIORITY_OPTIONS = [
   { key: 'high', label: 'Cao' },
   { key: 'medium', label: 'Trung bình' },
@@ -84,6 +86,9 @@ export default function CampaignDetail() {
   const [seatalkText, setSeatalkText] = useState('');
   const [seatalkLoading, setSeatalkLoading] = useState(false);
   const [seatalkSent, setSeatalkSent] = useState('');
+  const [showAddPost, setShowAddPost] = useState(false);
+  const [newPost, setNewPost] = useState({ title: '', post_type: '', scheduled_at: '', channels: [] });
+  const [addPostError, setAddPostError] = useState('');
 
   const load = useCallback(async () => {
     const c = await api.get(`/campaigns/${id}`);
@@ -133,6 +138,26 @@ export default function CampaignDetail() {
   const handleRemoveOperator = async (email) => {
     await api.delete(`/campaigns/${id}/assignments/${encodeURIComponent(email)}`);
     load();
+  };
+
+  const handleAddPost = async () => {
+    setAddPostError('');
+    if (!newPost.title.trim()) { setAddPostError('Cần nhập tên bài'); return; }
+    if (!newPost.scheduled_at) { setAddPostError('Cần chọn ngày giờ đăng'); return; }
+    try {
+      await api.post('/posts', {
+        campaign_id: id,
+        title: newPost.title.trim(),
+        post_type: newPost.post_type.trim() || 'POST',
+        scheduled_at: fromDatetimeLocalValue(newPost.scheduled_at),
+        channels: newPost.channels,
+      });
+      setNewPost({ title: '', post_type: '', scheduled_at: '', channels: [] });
+      setShowAddPost(false);
+      load();
+    } catch (e) {
+      setAddPostError(e.message);
+    }
   };
 
   const handleDeletePost = async (post) => {
@@ -327,7 +352,74 @@ export default function CampaignDetail() {
         return (
           <>
             <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-              <div className="text-xs font-bold text-slate-400 tracking-wide mb-3.5">📝 NỘI DUNG ({contentPosts.length})</div>
+              <div className="flex items-center justify-between mb-3.5">
+                <div className="text-xs font-bold text-slate-400 tracking-wide">📝 NỘI DUNG ({contentPosts.length})</div>
+                <button
+                  onClick={() => setShowAddPost(v => !v)}
+                  className="text-xs bg-slate-100 hover:bg-slate-200 rounded-md px-3 py-1.5 font-semibold cursor-pointer"
+                >
+                  + Thêm bài
+                </button>
+              </div>
+              {showAddPost && (
+                <div className="bg-slate-50 rounded-lg p-3 mb-3 flex flex-wrap gap-2 items-end">
+                  <div className="flex-1 min-w-[160px]">
+                    <div className="text-[10px] text-slate-400 mb-1">Tên bài</div>
+                    <input
+                      value={newPost.title}
+                      onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))}
+                      placeholder="VD: Preview vòng bảng"
+                      className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs outline-none"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-1">Loại</div>
+                    <input
+                      value={newPost.post_type}
+                      onChange={e => setNewPost(p => ({ ...p, post_type: e.target.value }))}
+                      placeholder="VD: Preview"
+                      className="border border-slate-200 rounded px-2 py-1.5 text-xs outline-none w-[110px]"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-1">Ngày giờ đăng</div>
+                    <input
+                      type="datetime-local"
+                      value={newPost.scheduled_at}
+                      onChange={e => setNewPost(p => ({ ...p, scheduled_at: e.target.value }))}
+                      className="border border-slate-200 rounded px-2 py-1.5 text-xs outline-none"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-1">Kênh</div>
+                    <div className="flex gap-1">
+                      {ADD_POST_CHANNEL_OPTIONS.map(ch => (
+                        <button
+                          key={ch}
+                          onClick={() => setNewPost(p => ({
+                            ...p, channels: p.channels.includes(ch) ? p.channels.filter(x => x !== ch) : [...p.channels, ch],
+                          }))}
+                          className="rounded-full px-2.5 py-1 text-[11px] cursor-pointer"
+                          style={{
+                            background: newPost.channels.includes(ch) ? '#E94560' : '#fff',
+                            color: newPost.channels.includes(ch) ? '#fff' : '#555',
+                            border: '1px solid #E8E8EE',
+                          }}
+                        >
+                          {ch}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={handleAddPost} className="bg-[#1A1A2E] text-white text-xs font-bold rounded px-3 py-2 cursor-pointer">
+                    Lưu
+                  </button>
+                  <button onClick={() => setShowAddPost(false)} className="text-xs text-slate-400 cursor-pointer px-1">
+                    Huỷ
+                  </button>
+                  {addPostError && <div className="text-xs text-red-600 w-full">{addPostError}</div>}
+                </div>
+              )}
               {contentPosts.slice(0, 10).map(renderRow)}
               {contentPosts.length > 10 && <div className="text-xs text-slate-400 mt-2">+ {contentPosts.length - 10} bài khác</div>}
               {contentPosts.length === 0 && <div className="text-xs text-slate-400">Chưa có nội dung nào.</div>}

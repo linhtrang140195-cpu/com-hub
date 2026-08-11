@@ -33,7 +33,7 @@ function NavItem({ to, icon, label }) {
   );
 }
 
-export default function Sidebar({ campaigns = [], onNewCampaign, activeCampaignId }) {
+export default function Sidebar({ campaigns = [], activeCampaignId }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const activeCampaigns = campaigns.filter(c => c.status === 'active');
@@ -70,15 +70,6 @@ export default function Sidebar({ campaigns = [], onNewCampaign, activeCampaignI
 
           <div className="px-4 pt-5 pb-2 text-[10px] text-slate-400 font-bold tracking-widest">THAO TÁC CỦA TÔI</div>
           {OPERATOR_NAV.filter(item => item.to !== '/operator/timeline').map(item => <NavItem key={item.to} {...item} />)}
-
-          <div className="mt-auto p-4">
-            <button
-              onClick={onNewCampaign}
-              className="w-full bg-[#1A1A2E] rounded-lg py-2.5 text-white text-[13px] font-bold cursor-pointer hover:bg-[#252542]"
-            >
-              + Tạo campaign mới
-            </button>
-          </div>
         </>
       ) : (
         <>
