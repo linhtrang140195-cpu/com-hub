@@ -31,29 +31,43 @@ router.post('/merge', async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    let added = 0, updated = 0;
+    let added = 0, updated = 0, skipped = 0;
     for (const p of posts) {
-      if (p.id) {
+      let matchedId = p.id || null;
+
+      // Rows from an Excel upload never carry a DB id — match them to an already-merged
+      // post in this campaign by external_id (the sheet row number) instead of blindly
+      // inserting a new row every time the same/updated plan is re-uploaded.
+      if (!matchedId && p.external_id) {
+        const [existing] = await conn.query(
+          'SELECT id FROM posts WHERE campaign_id = ? AND external_id = ?',
+          [campaign_id, p.external_id]
+        );
+        if (existing.length) matchedId = existing[0].id;
+      }
+
+      if (matchedId) {
         const [result] = await conn.query(
           `UPDATE posts SET scheduled_at=?, post_type=?, title=?, description=?, caption_hint=?,
             channels=?, operator_email=? WHERE id=? AND status='scheduled'`,
           [new Date(p.scheduled_at), p.post_type, p.title, p.description, p.caption_hint,
-           JSON.stringify(p.channels || []), p.operator_email || null, p.id]
+           JSON.stringify(p.channels || []), p.operator_email || null, matchedId]
         );
         if (result.affectedRows) updated++;
+        else skipped++;
       } else {
         await conn.query(
-          `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, description, caption_hint,
+          `INSERT INTO posts (id, campaign_id, external_id, scheduled_at, post_type, title, description, caption_hint,
              channels, operator_email)
-           VALUES (?,?,?,?,?,?,?,?,?)`,
-          [newId(), campaign_id, new Date(p.scheduled_at), p.post_type, p.title, p.description || null,
+           VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [newId(), campaign_id, p.external_id || null, new Date(p.scheduled_at), p.post_type, p.title, p.description || null,
            p.caption_hint || null, JSON.stringify(p.channels || []), p.operator_email || null]
         );
         added++;
       }
     }
     await conn.commit();
-    res.json({ added, updated });
+    res.json({ added, updated, skipped });
   } catch (e) {
     await conn.rollback();
     throw e;

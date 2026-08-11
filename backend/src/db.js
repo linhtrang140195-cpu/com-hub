@@ -59,6 +59,8 @@ async function runMigrations() {
       INDEX idx_tm_date (match_date)
     )` },
     { name: 'campaigns.priority', sql: `ALTER TABLE campaigns ADD COLUMN priority VARCHAR(16) NOT NULL DEFAULT 'medium' AFTER status` },
+    { name: 'posts.external_id', sql: 'ALTER TABLE posts ADD COLUMN external_id VARCHAR(64) NULL AFTER phase_id' },
+    { name: 'posts.idx_external', sql: 'CREATE INDEX idx_posts_external ON posts (campaign_id, external_id)' },
     { name: 'monthly_reflections', sql: `CREATE TABLE IF NOT EXISTS monthly_reflections (
       \`year_month\` VARCHAR(7) PRIMARY KEY,
       what_worked TEXT,
