@@ -51,7 +51,9 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   };
 
   useEffect(() => {
-    api.get('/campaign-types').then(setTypes).catch(console.error);
+    // 'lnd' is temporarily deprioritized — hidden from new-campaign creation, but existing
+    // lnd campaigns and their data are untouched.
+    api.get('/campaign-types').then(all => setTypes(all.filter(t => t.key !== 'lnd'))).catch(console.error);
   }, []);
 
   const handleSelectType = (t) => {

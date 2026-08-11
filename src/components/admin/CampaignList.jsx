@@ -1,14 +1,67 @@
+import { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { formatDateShort } from '../../utils/datetime';
+import { api } from '../../services/api';
 
 export default function CampaignList() {
   const { campaigns } = useOutletContext();
   const navigate = useNavigate();
-  const visible = campaigns.filter(c => c.status !== 'archived');
+  const [types, setTypes] = useState([]);
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [typeFilter, setTypeFilter] = useState('all');
+
+  useEffect(() => {
+    api.get('/campaign-types').then(all => setTypes(all.filter(t => t.key !== 'lnd'))).catch(console.error);
+  }, []);
+
+  const years = useMemo(() => {
+    const set = new Set(campaigns.map(c => new Date(c.start_date).getFullYear()));
+    set.add(new Date().getFullYear());
+    return [...set].sort((a, b) => b - a);
+  }, [campaigns]);
+
+  const typeInfo = useMemo(() => Object.fromEntries(types.map(t => [t.key, t])), [types]);
+
+  const visible = campaigns.filter(c =>
+    c.status !== 'archived' &&
+    String(new Date(c.start_date).getFullYear()) === year &&
+    (typeFilter === 'all' || c.type === typeFilter)
+  );
 
   return (
     <div>
-      <div className="text-[22px] font-extrabold mb-6">🗂️ Tất cả campaigns</div>
+      <div className="text-[22px] font-extrabold mb-4">🗂️ Tất cả campaigns</div>
+
+      <div className="flex items-center gap-3 mb-3">
+        <select
+          value={year}
+          onChange={e => setYear(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold outline-none"
+        >
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-5">
+        <button
+          onClick={() => setTypeFilter('all')}
+          className="text-xs font-bold rounded-full px-3 py-1.5 cursor-pointer"
+          style={{ background: typeFilter === 'all' ? '#1A1A2E' : '#F0F0F5', color: typeFilter === 'all' ? '#fff' : '#555' }}
+        >
+          Tất cả
+        </button>
+        {types.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTypeFilter(t.key)}
+            className="text-xs font-bold rounded-full px-3 py-1.5 cursor-pointer"
+            style={{ background: typeFilter === t.key ? t.color : '#F0F0F5', color: typeFilter === t.key ? '#fff' : '#555' }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         {visible.map(c => (
           <div
@@ -21,7 +74,7 @@ export default function CampaignList() {
               <div>
                 <div className="text-sm font-bold">{c.name}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
-                  {c.type} · {formatDateShort(c.start_date)} → {formatDateShort(c.end_date)}
+                  {typeInfo[c.type]?.label || c.type} · {formatDateShort(c.start_date)} → {formatDateShort(c.end_date)}
                 </div>
               </div>
               <div className="flex items-start gap-1.5">
@@ -39,7 +92,7 @@ export default function CampaignList() {
             </div>
           </div>
         ))}
-        {visible.length === 0 && <div className="text-sm text-slate-400 col-span-2">Chưa có campaign nào.</div>}
+        {visible.length === 0 && <div className="text-sm text-slate-400 col-span-2">Không có campaign nào khớp bộ lọc.</div>}
       </div>
     </div>
   );

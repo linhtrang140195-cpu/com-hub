@@ -7,6 +7,7 @@ import Badge from '../shared/Badge';
 import UploadExcelModal from './UploadExcelModal';
 import VersionPanel from './VersionPanel';
 import TournamentPanel from './TournamentPanel';
+import EventMetricsPanel from './EventMetricsPanel';
 
 const STATUS_OPTIONS = [
   { label: 'Chưa viết', patch: { status: 'scheduled', approval_status: 'draft' }, color: '#94a3b8', bg: '#f1f5f9' },
@@ -290,6 +291,8 @@ export default function CampaignDetail() {
       </div>
 
       {campaign.type === 'giai_dau' && <TournamentPanel campaignId={id} />}
+
+      <EventMetricsPanel campaign={campaign} onLinked={load} />
 
       <VersionPanel campaignId={id} onRollback={load} />
 

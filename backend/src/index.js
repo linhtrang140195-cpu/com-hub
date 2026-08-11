@@ -28,6 +28,7 @@ import reportRoutes from './routes/reports.js';
 import seatalkRoutes from './routes/seatalk.js';
 import tournamentRoutes from './routes/tournament.js';
 import { sendWebhookReminder } from './services/seatalkReminder.js';
+import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -86,6 +87,18 @@ async function start() {
       console.error('[seatalk-cron] error', e.message);
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
+
+  // Pull external event KPIs (e.g. NHAI DAY) for any linked campaign, every 30 min
+  const runNhaiDaySync = async () => {
+    try {
+      const synced = await syncAllLinkedCampaigns();
+      console.log(`[nhai-day-sync] synced ${synced} campaign(s)`);
+    } catch (e) {
+      console.error('[nhai-day-sync] error', e.message);
+    }
+  };
+  cron.schedule('*/30 * * * *', runNhaiDaySync);
+  runNhaiDaySync();
 }
 
 start().catch(e => {

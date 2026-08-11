@@ -84,6 +84,25 @@ export const DEFAULT_CAMPAIGN_TYPES = [
     is_builtin: true,
   },
   {
+    key: 'ic',
+    label: 'IC (Internal Comms)',
+    color: '#607D8B',
+    default_phases: ['Thông báo', 'Follow-up', 'Tổng kết'],
+    post_types: [
+      { name: 'Thông báo', needs_ai: false },
+      { name: 'FAQ', needs_ai: true },
+      { name: 'Follow-up', needs_ai: false },
+      { name: 'Recap', needs_ai: true },
+    ],
+    default_tone_rules: [],
+    metrics: [
+      { key: 'st_seen', label: 'SeaTalk — Seen', source: 'manual', source_detail: 'Điền tay' },
+      { key: 'st_react', label: 'SeaTalk — Reaction', source: 'manual', source_detail: 'Điền tay' },
+      { key: 'st_reply', label: 'SeaTalk — Reply', source: 'manual', source_detail: 'Điền tay' },
+    ],
+    is_builtin: true,
+  },
+  {
     key: 'custom',
     label: 'Custom',
     color: '#9B59B6',

@@ -138,6 +138,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   }
   if ('channels' in req.body) { sets.push('channels = ?'); values.push(JSON.stringify(req.body.channels)); }
   if ('tone_rules' in req.body) { sets.push('tone_rules = ?'); values.push(JSON.stringify(req.body.tone_rules)); }
+  if ('custom_config' in req.body) { sets.push('custom_config = ?'); values.push(JSON.stringify(req.body.custom_config)); }
   if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
   values.push(req.params.id);
   await query(`UPDATE campaigns SET ${sets.join(', ')} WHERE id = ?`, values);

@@ -1,9 +1,33 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { syncSeason } from '../services/nhaiDaySync.js';
 
 const router = Router();
 router.use(requireAdmin);
+
+router.get('/external-metrics/:campaign_id', async (req, res) => {
+  const { rows } = await query(
+    `SELECT metrics, generated_at FROM report_cache WHERE scope = 'external_event' AND scope_id = ?`,
+    [req.params.campaign_id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Not linked yet' });
+  const row = rows[0];
+  res.json({
+    metrics: typeof row.metrics === 'string' ? JSON.parse(row.metrics) : row.metrics,
+    generated_at: row.generated_at,
+  });
+});
+
+router.post('/external-metrics/:campaign_id/refresh', async (req, res) => {
+  const { rows } = await query('SELECT custom_config FROM campaigns WHERE id = ?', [req.params.campaign_id]);
+  if (!rows.length) return res.status(404).json({ error: 'Campaign not found' });
+  const config = typeof rows[0].custom_config === 'string' ? JSON.parse(rows[0].custom_config) : rows[0].custom_config;
+  const seasonId = config?.external_source?.season_id;
+  if (!seasonId) return res.status(400).json({ error: 'Campaign has no linked external_source.season_id' });
+  const metrics = await syncSeason(req.params.campaign_id, seasonId);
+  res.json({ metrics, generated_at: new Date().toISOString() });
+});
 
 router.get('/campaign/:id', async (req, res) => {
   const { rows: [campaign] } = await query('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);

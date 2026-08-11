@@ -23,7 +23,7 @@ const FIELD_CONFIG = {
     fields: ['topic', 'key_moment', 'image_url', 'custom_prompt'],
     labels: { topic: 'Chủ đề / Hoạt động', key_moment: 'Điểm nhấn nội dung' },
   },
-  su_kien: {
+  event: {
     fields: ['topic', 'key_moment', 'image_url', 'custom_prompt'],
     labels: { topic: 'Tên sự kiện / Hoạt động', key_moment: 'Thông tin chính' },
   },
