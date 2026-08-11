@@ -23,6 +23,7 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [aiPlan, setAiPlan] = useState(null);
+  const [planRows, setPlanRows] = useState([]);
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [createdCampaign, setCreatedCampaign] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
@@ -51,6 +52,7 @@ export default function NewCampaignModal({ onClose, onCreated }) {
         end_date: form.end_date,
       });
       setAiPlan(plan);
+      setPlanRows((plan.suggested_posts || []).map(p => ({ ...p, include: true })));
       // Apply tone suggestion if tone is empty
       if (!form.tone && plan.tone_suggestion) setForm(f => ({ ...f, tone: plan.tone_suggestion }));
     } catch (e) {
@@ -129,17 +131,23 @@ export default function NewCampaignModal({ onClose, onCreated }) {
     }
   };
 
+  const updatePlanRow = (i, patch) => setPlanRows(rows => rows.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+  const removePlanRow = (i) => setPlanRows(rows => rows.filter((_, idx) => idx !== i));
+  const addPlanRow = () => setPlanRows(rows => [...rows, { title: '', post_type: '', days_from_start: 0, note: '', include: true }]);
+
   const handleApplyAiPlan = async () => {
     setApplyPlanError('');
+    const selected = planRows.filter(r => r.include && r.title.trim());
+    if (!selected.length) { setApplyPlanError('Chưa chọn bài nào'); return; }
     setApplyingPlan(true);
     try {
       const base = new Date(`${form.start_date}T09:00:00+07:00`).getTime();
-      for (const p of aiPlan.suggested_posts) {
+      for (const p of selected) {
         await api.post('/posts', {
           campaign_id: createdCampaign.id,
-          title: p.title,
-          post_type: p.post_type || 'POST',
-          scheduled_at: new Date(base + (p.days_from_start || 0) * 86400000).toISOString(),
+          title: p.title.trim(),
+          post_type: p.post_type.trim() || 'POST',
+          scheduled_at: new Date(base + (Number(p.days_from_start) || 0) * 86400000).toISOString(),
           description: p.note || null,
           channels: form.channels,
         });
@@ -153,39 +161,82 @@ export default function NewCampaignModal({ onClose, onCreated }) {
   };
 
   if (createdCampaign) {
-    const hasAiPlan = aiPlan?.suggested_posts?.length > 0;
+    const hasAiPlan = planRows.length > 0;
     return (
       <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center">
-        <div className="bg-white rounded-2xl p-8 w-[460px]">
+        <div className={`bg-white rounded-2xl p-8 ${hasAiPlan ? 'w-[680px] max-h-[85vh] overflow-auto' : 'w-[460px]'}`}>
           <div className="text-lg font-extrabold mb-2">✓ Đã tạo "{createdCampaign.name}"</div>
-          <div className="text-sm text-slate-500 mb-5">
-            {hasAiPlan
-              ? `Áp dụng ${aiPlan.suggested_posts.length} bài từ plan AI đã gợi ý, upload file Excel plan sẵn có, hoặc bỏ qua và thêm bài thủ công sau.`
-              : 'Bạn có file Excel plan cho campaign này chưa? Upload ngay để tự động tạo lịch bài đăng, hoặc bỏ qua và thêm bài thủ công sau.'}
-          </div>
-          <div className="flex flex-col gap-2">
-            {hasAiPlan && (
-              <button
-                onClick={handleApplyAiPlan}
-                disabled={applyingPlan}
-                className="bg-[#E94560] text-white rounded-lg py-3 text-sm font-bold cursor-pointer disabled:opacity-50"
-              >
-                {applyingPlan ? 'Đang tạo bài...' : `🤖 Áp dụng plan AI (${aiPlan.suggested_posts.length} bài)`}
-              </button>
-            )}
-            <div className="flex gap-2.5">
-              <button
-                onClick={() => setShowUpload(true)}
-                className="flex-1 bg-[#1A1A2E] text-white rounded-lg py-3 text-sm font-bold cursor-pointer"
-              >
-                📎 Upload Excel plan
-              </button>
-              <button onClick={() => onCreated?.()} className="bg-slate-100 rounded-lg px-5 text-sm cursor-pointer">
-                Bỏ qua
-              </button>
-            </div>
-          </div>
-          {applyPlanError && <div className="text-xs text-red-600 mt-3">{applyPlanError}</div>}
+
+          {hasAiPlan ? (
+            <>
+              <div className="text-sm text-slate-500 mb-4">Duyệt lại plan AI gợi ý trước khi tạo bài — bỏ chọn, sửa, hoặc thêm dòng nếu cần.</div>
+              <div className="border border-slate-200 rounded-lg overflow-hidden mb-3">
+                <div className="grid grid-cols-[24px_1.6fr_110px_70px_1.4fr_24px] gap-2 px-3 py-2 bg-slate-50 text-[10px] font-bold text-slate-400">
+                  <span></span><span>TÊN BÀI</span><span>LOẠI</span><span>+NGÀY</span><span>GHI CHÚ</span><span></span>
+                </div>
+                {planRows.map((r, i) => (
+                  <div key={i} className="grid grid-cols-[24px_1.6fr_110px_70px_1.4fr_24px] gap-2 px-3 py-1.5 border-t border-slate-100 items-center">
+                    <input type="checkbox" checked={r.include} onChange={e => updatePlanRow(i, { include: e.target.checked })} />
+                    <input
+                      value={r.title}
+                      onChange={e => updatePlanRow(i, { title: e.target.value })}
+                      className="border border-slate-200 rounded px-1.5 py-1 text-xs outline-none w-full"
+                    />
+                    <input
+                      value={r.post_type}
+                      onChange={e => updatePlanRow(i, { post_type: e.target.value })}
+                      className="border border-slate-200 rounded px-1.5 py-1 text-xs outline-none w-full"
+                    />
+                    <input
+                      type="number"
+                      value={r.days_from_start}
+                      onChange={e => updatePlanRow(i, { days_from_start: e.target.value })}
+                      className="border border-slate-200 rounded px-1.5 py-1 text-xs outline-none w-full"
+                    />
+                    <input
+                      value={r.note || ''}
+                      onChange={e => updatePlanRow(i, { note: e.target.value })}
+                      className="border border-slate-200 rounded px-1.5 py-1 text-xs outline-none w-full"
+                    />
+                    <button onClick={() => removePlanRow(i)} className="text-slate-300 hover:text-red-500 cursor-pointer text-xs">🗑</button>
+                  </div>
+                ))}
+              </div>
+              <button onClick={addPlanRow} className="text-xs text-[#E94560] font-bold cursor-pointer mb-4">+ Thêm dòng</button>
+
+              <div className="flex gap-2.5">
+                <button
+                  onClick={handleApplyAiPlan}
+                  disabled={applyingPlan}
+                  className="flex-1 bg-[#E94560] text-white rounded-lg py-3 text-sm font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {applyingPlan ? 'Đang tạo bài...' : `✓ Tạo ${planRows.filter(r => r.include && r.title.trim()).length} bài đã chọn`}
+                </button>
+                <button onClick={() => setShowUpload(true)} className="bg-slate-100 rounded-lg px-4 text-sm cursor-pointer">
+                  📎 Upload Excel thay vào đó
+                </button>
+                <button onClick={() => onCreated?.()} className="text-sm text-slate-400 cursor-pointer px-2">
+                  Bỏ qua
+                </button>
+              </div>
+              {applyPlanError && <div className="text-xs text-red-600 mt-3">{applyPlanError}</div>}
+            </>
+          ) : (
+            <>
+              <div className="text-sm text-slate-500 mb-5">Bạn có file Excel plan cho campaign này chưa? Upload ngay để tự động tạo lịch bài đăng, hoặc bỏ qua và thêm bài thủ công sau.</div>
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setShowUpload(true)}
+                  className="flex-1 bg-[#1A1A2E] text-white rounded-lg py-3 text-sm font-bold cursor-pointer"
+                >
+                  📎 Upload Excel plan
+                </button>
+                <button onClick={() => onCreated?.()} className="bg-slate-100 rounded-lg px-5 text-sm cursor-pointer">
+                  Bỏ qua
+                </button>
+              </div>
+            </>
+          )}
         </div>
         {showUpload && (
           <UploadExcelModal
