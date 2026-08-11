@@ -12,6 +12,10 @@ router.get('/', requireAuth, async (req, res) => {
 
   const clauses = [];
   const params = [];
+  // Archived campaigns should disappear from general listings (Master Timeline, Viết bài,
+  // digests...) — but a caller asking for one specific campaign_id (e.g. Campaign Detail,
+  // Archive page) still gets its posts regardless of archive status.
+  if (!campaign_id) { clauses.push(`c.status != 'archived'`); }
   if (campaign_id) { clauses.push(`p.campaign_id = ?`); params.push(campaign_id); }
   if (from) { clauses.push(`p.scheduled_at >= ?`); params.push(new Date(from)); }
   if (to) { clauses.push(`p.scheduled_at <= ?`); params.push(new Date(to)); }
