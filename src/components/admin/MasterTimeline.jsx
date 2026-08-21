@@ -227,15 +227,18 @@ export default function MasterTimeline() {
                           {/* Time + campaign */}
                           <div className="flex items-center gap-1 mb-0.5">
                             {editingTime?.postId === p.id ? (
-                              <input
-                                type="time"
-                                value={editingTime.value}
-                                onChange={e => setEditingTime(t => ({ ...t, value: e.target.value }))}
-                                onBlur={() => handleTimeSave(p)}
-                                onKeyDown={e => { if (e.key === 'Enter') handleTimeSave(p); if (e.key === 'Escape') setEditingTime(null); }}
-                                autoFocus
-                                className="text-[10px] font-bold border border-blue-400 rounded px-1 outline-none w-[52px] bg-white"
-                              />
+                              <div className="flex items-center gap-0.5">
+                                <input
+                                  type="time"
+                                  value={editingTime.value}
+                                  onChange={e => setEditingTime(t => ({ ...t, value: e.target.value }))}
+                                  onKeyDown={e => { if (e.key === 'Enter') handleTimeSave(p); if (e.key === 'Escape') setEditingTime(null); }}
+                                  autoFocus
+                                  className="text-[10px] font-bold border border-blue-400 rounded px-1 outline-none w-[52px] bg-white"
+                                />
+                                <button onClick={() => handleTimeSave(p)} className="text-[10px] text-green-600 font-bold cursor-pointer leading-none">✓</button>
+                                <button onClick={() => setEditingTime(null)} className="text-[9px] text-slate-400 cursor-pointer leading-none">✕</button>
+                              </div>
                             ) : (
                               <button
                                 onClick={() => handleTimeClick(p)}
