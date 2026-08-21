@@ -163,6 +163,33 @@ export default function CaptionGenerator() {
     }
   };
 
+  const [autoMatches, setAutoMatches] = useState([]);
+
+  // Auto-fill team/round from tournament website when opening a giai_dau post
+  useEffect(() => {
+    if (!post || post.campaign_type !== 'giai_dau' || !campaign?.website) return;
+    const dateVN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
+      .format(new Date(post.scheduled_at));
+    api.get(`/tournaments/${post.campaign_id}/live-schedule?date=${dateVN}`)
+      .then(data => {
+        const matches = data.matches || [];
+        setAutoMatches(matches);
+        if (matches.length === 1) applyMatch(matches[0]);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id, campaign?.website]);
+
+  const applyMatch = (m) => {
+    setInputs(i => ({
+      ...i,
+      team_a: m.doi_a || i.team_a,
+      team_b: m.doi_b || i.team_b,
+      match_round: [m.vong, m.bang ? `Bảng ${m.bang}` : ''].filter(Boolean).join(' — ') || i.match_round,
+    }));
+    setAutoMatches([]);
+  };
+
   const [savedDraft, setSavedDraft] = useState(false);
 
   const handleSaveDraft = async () => {
@@ -241,6 +268,24 @@ export default function CaptionGenerator() {
             {compassLoading ? '⏳ Compass đang gợi ý...' : '✨ AI Suggest — Compass tự sinh caption nhanh'}
           </button>
           <div className="text-[10px] text-slate-400 text-center mt-1">Dựa trên tiêu đề bài + tone campaign, không cần điền thêm</div>
+        </div>
+      )}
+
+      {/* Multiple matches on same day — let user pick */}
+      {autoMatches.length > 1 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+          <div className="text-[11px] font-bold text-blue-600 mb-2 tracking-wide">📌 {autoMatches.length} TRẬN HÔM NAY — CHỌN TRẬN ĐỂ ĐIỀN TỰ ĐỘNG:</div>
+          <div className="space-y-1">
+            {autoMatches.map((m, i) => (
+              <button
+                key={i}
+                onClick={() => applyMatch(m)}
+                className="block w-full text-left text-[12px] text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-lg font-medium cursor-pointer"
+              >
+                {m.doi_a} vs {m.doi_b}{m.bang ? ` — Bảng ${m.bang}` : ''}{m.vong ? ` (${m.vong})` : ''}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

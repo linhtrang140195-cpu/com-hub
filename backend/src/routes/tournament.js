@@ -33,7 +33,7 @@ router.get('/:campaign_id/live-schedule', requireAuth, async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: 'Campaign not found' });
   const campaign = rows[0];
   if (!campaign.website) return res.status(400).json({ error: 'Campaign chưa có URL giải đấu' });
-  const ctx = await fetchTournamentContext(campaign, null);
+  const ctx = await fetchTournamentContext(campaign, req.query.date || null);
   if (!ctx) return res.status(502).json({ error: 'Không lấy được dữ liệu từ website giải đấu' });
   res.json({ matches: ctx.matches, standings: ctx.standings, website: campaign.website });
 });
