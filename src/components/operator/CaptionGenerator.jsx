@@ -165,20 +165,40 @@ export default function CaptionGenerator() {
 
   const [autoMatches, setAutoMatches] = useState([]);
 
-  // Auto-fill team/round from tournament website when opening a giai_dau post
+  // Auto-fill team/round/score from tournament website when opening a giai_dau post
   useEffect(() => {
     if (!post || post.campaign_type !== 'giai_dau' || !campaign?.website) return;
-    const dateVN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
-      .format(new Date(post.scheduled_at));
-    api.get(`/tournaments/${post.campaign_id}/live-schedule?date=${dateVN}`)
+    api.get(`/tournaments/${post.campaign_id}/live-schedule`)
       .then(data => {
-        const matches = data.matches || [];
-        setAutoMatches(matches);
-        if (matches.length === 1) applyMatch(matches[0]);
+        const all = data.matches || [];
+        if (!all.length) return;
+
+        const postDate = new Date(post.scheduled_at);
+        const pt = (post.post_type || postType || '').toLowerCase();
+        const isResult = /result|highlight|recap|bxh/.test(pt);
+
+        let ranked;
+        if (isResult) {
+          // Most recently completed match at or before the post date
+          ranked = all
+            .filter(m => m.ti_so)
+            .sort((a, b) => new Date(b.thoi_gian) - new Date(a.thoi_gian));
+        } else {
+          // Upcoming match closest to the post date (no score yet)
+          ranked = all
+            .filter(m => !m.ti_so)
+            .sort((a, b) =>
+              Math.abs(new Date(a.thoi_gian) - postDate) - Math.abs(new Date(b.thoi_gian) - postDate)
+            );
+        }
+
+        if (!ranked.length) return;
+        setAutoMatches(ranked.slice(0, 6));
+        if (ranked.length === 1) applyMatch(ranked[0]);
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?.id, campaign?.website]);
+  }, [post?.id, campaign?.website, postType]);
 
   const applyMatch = (m) => {
     setInputs(i => ({
@@ -186,6 +206,7 @@ export default function CaptionGenerator() {
       team_a: m.doi_a || i.team_a,
       team_b: m.doi_b || i.team_b,
       match_round: [m.vong, m.bang ? `Bảng ${m.bang}` : ''].filter(Boolean).join(' — ') || i.match_round,
+      ...(m.ti_so ? { score: m.ti_so } : {}),
     }));
     setAutoMatches([]);
   };
@@ -271,21 +292,32 @@ export default function CaptionGenerator() {
         </div>
       )}
 
-      {/* Multiple matches on same day — let user pick */}
-      {autoMatches.length > 1 && (
+      {/* Match picker from tournament website */}
+      {autoMatches.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-          <div className="text-[11px] font-bold text-blue-600 mb-2 tracking-wide">📌 {autoMatches.length} TRẬN HÔM NAY — CHỌN TRẬN ĐỂ ĐIỀN TỰ ĐỘNG:</div>
+          <div className="text-[11px] font-bold text-blue-600 mb-2 tracking-wide">
+            📡 DỮ LIỆU TỪ WEBSITE — CHỌN TRẬN ĐỂ ĐIỀN TỰ ĐỘNG:
+          </div>
           <div className="space-y-1">
             {autoMatches.map((m, i) => (
               <button
                 key={i}
                 onClick={() => applyMatch(m)}
-                className="block w-full text-left text-[12px] text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-lg font-medium cursor-pointer"
+                className="flex items-center gap-2 w-full text-left text-[12px] text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-lg font-medium cursor-pointer"
               >
-                {m.doi_a} vs {m.doi_b}{m.bang ? ` — Bảng ${m.bang}` : ''}{m.vong ? ` (${m.vong})` : ''}
+                <span className="font-bold shrink-0">{m.doi_a}</span>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-bold shrink-0 ${m.ti_so ? 'bg-slate-200 text-slate-700' : 'bg-blue-200 text-blue-600'}`}>
+                  {m.ti_so || 'VS'}
+                </span>
+                <span className="font-bold shrink-0">{m.doi_b}</span>
+                {m.bang && <span className="text-[10px] text-blue-400 shrink-0">Bảng {m.bang}</span>}
+                {m.thoi_gian && <span className="text-[10px] text-slate-400 ml-auto shrink-0">{String(m.thoi_gian).slice(0, 10)}</span>}
               </button>
             ))}
           </div>
+          <button onClick={() => setAutoMatches([])} className="text-[10px] text-blue-400 mt-2 cursor-pointer hover:text-blue-600">
+            Ẩn danh sách
+          </button>
         </div>
       )}
 
