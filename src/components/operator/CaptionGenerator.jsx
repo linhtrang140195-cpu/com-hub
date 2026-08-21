@@ -165,9 +165,11 @@ export default function CaptionGenerator() {
 
   const [autoMatches, setAutoMatches] = useState([]);
 
-  // Auto-fill team/round/score from tournament website when opening a giai_dau post
+  // Auto-fill team/round/score from tournament website when opening a post with a website URL
   useEffect(() => {
-    if (!post || post.campaign_type !== 'giai_dau' || !campaign?.website) return;
+    const website = post?.website || campaign?.website;
+    if (!post || !website) return;
+    setAutoMatches([]);
     api.get(`/tournaments/${post.campaign_id}/live-schedule`)
       .then(data => {
         const all = data.matches || [];
@@ -179,12 +181,10 @@ export default function CaptionGenerator() {
 
         let ranked;
         if (isResult) {
-          // Most recently completed match at or before the post date
           ranked = all
             .filter(m => m.ti_so)
             .sort((a, b) => new Date(b.thoi_gian) - new Date(a.thoi_gian));
         } else {
-          // Upcoming match closest to the post date (no score yet)
           ranked = all
             .filter(m => !m.ti_so)
             .sort((a, b) =>
@@ -198,7 +198,7 @@ export default function CaptionGenerator() {
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?.id, campaign?.website, postType]);
+  }, [post?.id, post?.website, campaign?.website, postType]);
 
   const applyMatch = (m) => {
     setInputs(i => ({
