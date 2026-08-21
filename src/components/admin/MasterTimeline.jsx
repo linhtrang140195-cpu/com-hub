@@ -97,6 +97,26 @@ export default function MasterTimeline() {
     setCreateModal(null);
   };
 
+  const [editingTime, setEditingTime] = useState(null); // { postId, value }
+
+  const handleTimeClick = (p) => {
+    const t = new Date(p.scheduled_at);
+    const hh = String(t.getHours()).padStart(2, '0');
+    const mm = String(t.getMinutes()).padStart(2, '0');
+    setEditingTime({ postId: p.id, value: `${hh}:${mm}` });
+  };
+
+  const handleTimeSave = async (p) => {
+    if (!editingTime || editingTime.postId !== p.id) return;
+    const [hh, mm] = editingTime.value.split(':');
+    const d = new Date(p.scheduled_at);
+    d.setHours(parseInt(hh), parseInt(mm || 0), 0, 0);
+    setEditingTime(null);
+    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, scheduled_at: d.toISOString() } : x));
+    await api.patch(`/posts/${p.id}`, { scheduled_at: d.toISOString() });
+    load(); // reload to refresh conflict detection
+  };
+
   const today = new Date();
 
   return (
@@ -206,9 +226,25 @@ export default function MasterTimeline() {
                         >
                           {/* Time + campaign */}
                           <div className="flex items-center gap-1 mb-0.5">
-                            <span className={`text-[10px] font-bold ${isConflict ? 'text-[#E94560]' : 'text-slate-400'}`}>
-                              {formatTimeVN(p.scheduled_at)}
-                            </span>
+                            {editingTime?.postId === p.id ? (
+                              <input
+                                type="time"
+                                value={editingTime.value}
+                                onChange={e => setEditingTime(t => ({ ...t, value: e.target.value }))}
+                                onBlur={() => handleTimeSave(p)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleTimeSave(p); if (e.key === 'Escape') setEditingTime(null); }}
+                                autoFocus
+                                className="text-[10px] font-bold border border-blue-400 rounded px-1 outline-none w-[52px] bg-white"
+                              />
+                            ) : (
+                              <button
+                                onClick={() => handleTimeClick(p)}
+                                title="Click để sửa giờ"
+                                className={`text-[10px] font-bold cursor-pointer hover:underline ${isConflict ? 'text-[#E94560]' : 'text-slate-400 hover:text-slate-600'}`}
+                              >
+                                {formatTimeVN(p.scheduled_at)}
+                              </button>
+                            )}
                             {isConflict && (
                               <span className="text-[9px] bg-red-100 text-[#E94560] px-1 rounded font-bold">CONFLICT</span>
                             )}
