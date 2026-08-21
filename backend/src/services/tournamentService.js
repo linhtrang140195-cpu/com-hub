@@ -43,6 +43,73 @@ export async function fetchTournamentContext(campaign, targetDate) {
   }
 }
 
+// Sync website match data into posts: update caption_hint + title for scheduled posts.
+// Safe: only updates title if it doesn't already contain "vs" (i.e. still generic).
+export async function syncPostsFromWebsite(campaign) {
+  const { query } = await import('../db.js');
+  const ctx = await fetchTournamentContext(campaign, null);
+  if (!ctx?.matches?.length) return { synced: 0, total: 0 };
+
+  const { rows: posts } = await query(
+    `SELECT id, title, post_type, scheduled_at, caption_hint FROM posts
+     WHERE campaign_id = ? AND status IN ('scheduled','pending')
+     ORDER BY scheduled_at ASC`,
+    [campaign.id]
+  );
+
+  const fmt = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(d));
+
+  let synced = 0;
+  for (const post of posts) {
+    const postDateVN = fmt(post.scheduled_at);
+    const prevDateVN = fmt(new Date(new Date(post.scheduled_at).getTime() - 86400000));
+
+    const pt = (post.post_type || '').toLowerCase();
+    const isResult = /result|highlight|recap|bxh/.test(pt);
+
+    let relevant;
+    if (isResult) {
+      relevant = ctx.matches.filter(m => {
+        const d = String(m.thoi_gian || '').slice(0, 10);
+        return (d === postDateVN || d === prevDateVN) && m.ti_so;
+      });
+    } else {
+      relevant = ctx.matches.filter(m =>
+        String(m.thoi_gian || '').slice(0, 10) === postDateVN
+      );
+    }
+
+    if (!relevant.length) continue;
+
+    // Build caption_hint with match context
+    const hintLines = relevant.map(m => {
+      const score = m.ti_so ? ` — ${m.ti_so}` : '';
+      const group = m.bang ? ` [Bảng ${m.bang}]` : '';
+      const round = m.vong ? ` (${m.vong})` : '';
+      return `${m.doi_a} vs ${m.doi_b}${score}${group}${round}`;
+    }).join('\n');
+    const newHint = `[Đồng bộ web]\n${hintLines}`;
+
+    // Update title only if still generic (no "vs" in title)
+    let newTitle = post.title;
+    if (!post.title.includes(' vs ') && relevant.length === 1) {
+      const m = relevant[0];
+      const matchStr = isResult && m.ti_so
+        ? `${m.doi_a} ${m.ti_so} ${m.doi_b}`
+        : `${m.doi_a} vs ${m.doi_b}`;
+      // Replace trailing "— Ngày N" or "— Ngày N (suffix)" with match info
+      newTitle = post.title.replace(/\s*[—-]\s*Ngày\s*\d+.*$/i, '').trim() + ` — ${matchStr}`;
+    }
+
+    await query(
+      'UPDATE posts SET caption_hint = ?, title = ? WHERE id = ?',
+      [newHint, newTitle, post.id]
+    );
+    synced++;
+  }
+  return { synced, total: posts.length };
+}
+
 export function formatTournamentContextText({ matches, standings }) {
   const parts = [];
 

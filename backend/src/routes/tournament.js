@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query, newId } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
-import { fetchTournamentContext, formatTournamentContextText } from '../services/tournamentService.js';
+import { fetchTournamentContext, formatTournamentContextText, syncPostsFromWebsite } from '../services/tournamentService.js';
 import { suggestNextPostsViaCompass } from '../services/compass.js';
 
 const router = Router();
@@ -48,6 +48,15 @@ router.post('/:campaign_id/suggest-posts', requireAuth, async (req, res) => {
   if (!ctx?.matches?.length) return res.status(502).json({ error: 'Không lấy được lịch trận từ website' });
   const suggestions = await suggestNextPostsViaCompass(campaign, ctx.matches);
   res.json({ suggestions });
+});
+
+// POST /tournaments/:campaign_id/sync-posts — match website schedule to posts, update titles + caption hints
+router.post('/:campaign_id/sync-posts', requireAuth, async (req, res) => {
+  const { rows } = await query('SELECT * FROM campaigns WHERE id = ?', [req.params.campaign_id]);
+  if (!rows.length) return res.status(404).json({ error: 'Campaign not found' });
+  if (!rows[0].website) return res.status(400).json({ error: 'Campaign chưa có URL giải đấu' });
+  const result = await syncPostsFromWebsite(rows[0]);
+  res.json(result);
 });
 
 // GET /tournaments/:campaign_id/teams

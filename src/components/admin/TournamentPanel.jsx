@@ -27,6 +27,10 @@ export default function TournamentPanel({ campaign, campaignId }) {
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestError, setSuggestError] = useState('');
 
+  // Sync posts from website
+  const [syncPostsLoading, setSyncPostsLoading] = useState(false);
+  const [syncPostsMsg, setSyncPostsMsg] = useState('');
+
   const load = async () => {
     const [t, m] = await Promise.all([
       api.get(`/tournaments/${campaignId}/teams`),
@@ -112,6 +116,20 @@ export default function TournamentPanel({ campaign, campaignId }) {
     }
   };
 
+  const handleSyncPosts = async () => {
+    setSyncPostsLoading(true);
+    setSyncPostsMsg('');
+    try {
+      const data = await api.post(`/tournaments/${campaignId}/sync-posts`, {});
+      setSyncPostsMsg(`✓ Cập nhật ${data.synced}/${data.total} bài theo lịch trận`);
+      setTimeout(() => setSyncPostsMsg(''), 4000);
+    } catch (e) {
+      setSyncPostsMsg(`⚠️ ${e.message}`);
+    } finally {
+      setSyncPostsLoading(false);
+    }
+  };
+
   const handleSuggestPosts = async () => {
     setSuggestLoading(true);
     setSuggestError('');
@@ -165,6 +183,13 @@ export default function TournamentPanel({ campaign, campaignId }) {
             {liveLoading ? '⏳ Đang tải...' : '🔄 Đồng bộ từ web'}
           </button>
           <button
+            onClick={handleSyncPosts}
+            disabled={!urlSet || syncPostsLoading}
+            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md px-3 py-1.5 cursor-pointer disabled:opacity-40 whitespace-nowrap"
+          >
+            {syncPostsLoading ? '⏳ Đang cập nhật...' : '📝 Cập nhật bài theo lịch'}
+          </button>
+          <button
             onClick={handleSuggestPosts}
             disabled={!urlSet || suggestLoading}
             className="text-xs bg-[#E94560] hover:bg-[#d03050] text-white font-bold rounded-md px-3 py-1.5 cursor-pointer disabled:opacity-40 whitespace-nowrap"
@@ -172,6 +197,7 @@ export default function TournamentPanel({ campaign, campaignId }) {
             {suggestLoading ? '⏳ Đang gợi ý...' : '💡 Gợi ý bài tiếp theo'}
           </button>
         </div>
+        {syncPostsMsg && <div className="text-xs text-indigo-700 mt-2 font-medium">{syncPostsMsg}</div>}
         {liveError && <div className="text-xs text-red-500 mt-2">⚠️ {liveError}</div>}
         {suggestError && <div className="text-xs text-red-500 mt-2">⚠️ {suggestError}</div>}
       </div>

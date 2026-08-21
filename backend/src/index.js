@@ -30,6 +30,8 @@ import tournamentRoutes from './routes/tournament.js';
 import reflectionRoutes from './routes/reflections.js';
 import { sendWebhookReminder, sendWeeklyWebhookReminder } from './services/seatalkReminder.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
+import { syncPostsFromWebsite } from './services/tournamentService.js';
+import { query } from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -99,6 +101,24 @@ async function start() {
       console.error('[seatalk-weekly-cron] error', e.message);
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
+
+  // Auto-sync tournament schedule from websites every 3 hours (active giai_dau campaigns with website set)
+  const runTournamentSync = async () => {
+    try {
+      const { rows: campaigns } = await query(
+        "SELECT * FROM campaigns WHERE type = 'giai_dau' AND status = 'active' AND website IS NOT NULL"
+      );
+      for (const c of campaigns) {
+        const result = await syncPostsFromWebsite(c);
+        if (result.synced > 0)
+          console.log(`[tournament-sync] ${c.name}: ${result.synced}/${result.total} posts updated`);
+      }
+    } catch (e) {
+      console.error('[tournament-sync] error', e.message);
+    }
+  };
+  cron.schedule('0 */3 * * *', runTournamentSync, { timezone: 'Asia/Ho_Chi_Minh' });
+  runTournamentSync(); // run once on startup
 
   // Pull external event KPIs (e.g. NHAI DAY) for any linked campaign, every 30 min
   const runNhaiDaySync = async () => {
