@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { query, newId } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { fetchTournamentContext, formatTournamentContextText } from '../services/tournamentService.js';
+import { suggestNextPostsViaCompass } from '../services/compass.js';
 
 const router = Router();
 
@@ -24,6 +26,29 @@ function parseTeamsCsv(text) {
     };
   }).filter(t => t.name);
 }
+
+// GET /tournaments/:campaign_id/live-schedule — fetch schedule + standings from campaign.website
+router.get('/:campaign_id/live-schedule', requireAuth, async (req, res) => {
+  const { rows } = await query('SELECT * FROM campaigns WHERE id = ?', [req.params.campaign_id]);
+  if (!rows.length) return res.status(404).json({ error: 'Campaign not found' });
+  const campaign = rows[0];
+  if (!campaign.website) return res.status(400).json({ error: 'Campaign chưa có URL giải đấu' });
+  const ctx = await fetchTournamentContext(campaign, null);
+  if (!ctx) return res.status(502).json({ error: 'Không lấy được dữ liệu từ website giải đấu' });
+  res.json({ matches: ctx.matches, standings: ctx.standings, website: campaign.website });
+});
+
+// POST /tournaments/:campaign_id/suggest-posts — Compass gợi ý bài tiếp theo từ lịch trận
+router.post('/:campaign_id/suggest-posts', requireAuth, async (req, res) => {
+  const { rows } = await query('SELECT * FROM campaigns WHERE id = ?', [req.params.campaign_id]);
+  if (!rows.length) return res.status(404).json({ error: 'Campaign not found' });
+  const campaign = rows[0];
+  if (!campaign.website) return res.status(400).json({ error: 'Campaign chưa có URL giải đấu' });
+  const ctx = await fetchTournamentContext(campaign, null);
+  if (!ctx?.matches?.length) return res.status(502).json({ error: 'Không lấy được lịch trận từ website' });
+  const suggestions = await suggestNextPostsViaCompass(campaign, ctx.matches);
+  res.json({ suggestions });
+});
 
 // GET /tournaments/:campaign_id/teams
 router.get('/:campaign_id/teams', requireAuth, async (req, res) => {

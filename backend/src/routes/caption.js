@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { generateCaption as generateCaptionClaude, generateCampaignPlan } from '../services/claude.js';
 import { generateCaption as generateCaptionOpenAI } from '../services/openai.js';
+import { generateCaptionViaCompass } from '../services/compass.js';
 import { fetchTournamentContext, formatTournamentContextText } from '../services/tournamentService.js';
 import { requireAuth, requireCampaignAccess } from '../middleware/auth.js';
 
@@ -45,6 +46,33 @@ router.post('/generate', requireAuth, requireCampaignAccess(req => req.body.camp
   } catch (e) {
     console.error('[caption]', e);
     res.status(500).json({ error: e.message || 'Caption generation failed' });
+  }
+});
+
+router.post('/compass-suggest', requireAuth, async (req, res) => {
+  try {
+    const { post_id } = req.body;
+    if (!post_id) return res.status(400).json({ error: 'post_id required' });
+    const { rows: postRows } = await query(
+      `SELECT p.*, c.name, c.tone, c.slogan, c.tone_rules, c.website FROM posts p JOIN campaigns c ON c.id = p.campaign_id WHERE p.id = ?`,
+      [post_id]
+    );
+    if (!postRows.length) return res.status(404).json({ error: 'Post not found' });
+    const row = postRows[0];
+    const post = { title: row.title, post_type: row.post_type, caption_hint: row.caption_hint };
+    const campaign = { name: row.name, tone: row.tone, slogan: row.slogan, tone_rules: row.tone_rules, website: row.website };
+
+    let tournamentContext = null;
+    try {
+      const ctx = await fetchTournamentContext(campaign, row.scheduled_at);
+      if (ctx) tournamentContext = formatTournamentContextText(ctx);
+    } catch (_) { /* tournament fetch is optional */ }
+
+    const result = await generateCaptionViaCompass(post, campaign, tournamentContext);
+    res.json({ ...result, hadTournamentContext: !!tournamentContext });
+  } catch (e) {
+    console.error('[compass-suggest]', e);
+    res.status(500).json({ error: e.message || 'Compass suggest failed' });
   }
 });
 

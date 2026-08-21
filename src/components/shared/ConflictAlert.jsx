@@ -1,13 +1,26 @@
+import { useState } from 'react';
+
 export default function ConflictAlert({ conflicts, posts }) {
+  const [expanded, setExpanded] = useState(false);
   if (!conflicts?.length) return null;
   const byId = Object.fromEntries(posts.map(p => [p.id, p]));
 
   return (
-    <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 mb-5 flex items-start gap-2.5">
-      <span className="text-base leading-none">⚠️</span>
-      <div className="text-sm">
-        <span className="font-bold text-amber-800">{conflicts.length} conflict phát hiện</span>
-        <ul className="mt-1 space-y-0.5 text-slate-600 text-xs">
+    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-5">
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="flex items-center gap-2 w-full text-left cursor-pointer"
+      >
+        <span className="text-sm">⚠️</span>
+        <span className="text-[13px] font-semibold text-amber-800">
+          {conflicts.length} conflict lịch đăng
+        </span>
+        <span className="ml-auto text-[11px] text-amber-600 hover:text-amber-800">
+          {expanded ? '▲ Ẩn' : '▼ Xem chi tiết'}
+        </span>
+      </button>
+      {expanded && (
+        <ul className="mt-2 space-y-0.5 text-slate-600 text-xs pl-6 border-t border-amber-200 pt-2">
           {conflicts.map((c, i) => {
             const a = byId[c.post_a];
             const b = byId[c.post_b];
@@ -19,7 +32,7 @@ export default function ConflictAlert({ conflicts, posts }) {
             );
           })}
         </ul>
-      </div>
+      )}
     </div>
   );
 }

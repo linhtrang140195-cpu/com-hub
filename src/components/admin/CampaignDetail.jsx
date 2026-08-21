@@ -86,6 +86,8 @@ export default function CampaignDetail() {
   const [seatalkText, setSeatalkText] = useState('');
   const [seatalkLoading, setSeatalkLoading] = useState(false);
   const [seatalkSent, setSeatalkSent] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookSaving, setWebhookSaving] = useState(false);
   const [showAddPost, setShowAddPost] = useState(false);
   const BLANK_POST = { id: null, title: '', post_type: '', scheduled_at: '', channels: [], description: '', caption_hint: '', image_url: '' };
   const [newPost, setNewPost] = useState(BLANK_POST);
@@ -99,6 +101,7 @@ export default function CampaignDetail() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setWebhookUrl(campaign?.seatalk_webhook_url || ''); }, [campaign?.seatalk_webhook_url]);
 
   if (!campaign) return <div className="text-sm text-slate-400">Đang tải...</div>;
 
@@ -200,10 +203,20 @@ export default function CampaignDetail() {
     navigate('/admin/campaigns');
   };
 
+  const handleSaveWebhook = async () => {
+    setWebhookSaving(true);
+    try {
+      await api.patch(`/campaigns/${id}`, { seatalk_webhook_url: webhookUrl.trim() || null });
+      await load();
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
   const handlePreviewSeatalk = async () => {
     setSeatalkLoading(true);
     try {
-      const { text } = await api.get('/seatalk/today-text');
+      const { text } = await api.get(`/seatalk/campaign-today-text?campaign_id=${id}`);
       setSeatalkText(text);
     } finally {
       setSeatalkLoading(false);
@@ -214,8 +227,8 @@ export default function CampaignDetail() {
     setSeatalkLoading(true);
     setSeatalkSent('');
     try {
-      const result = await api.post('/seatalk/send-reminder', {});
-      setSeatalkSent(result.ok ? `✓ Đã gửi ${result.count} bài lên SeaTalk` : `⚠️ ${result.reason}`);
+      const result = await api.post('/seatalk/send-campaign-reminder', { campaign_id: id, text: seatalkText });
+      setSeatalkSent(result.ok ? '✓ Đã gửi lên SeaTalk' : `⚠️ ${result.reason}`);
     } catch (e) {
       setSeatalkSent(`⚠️ ${e.message}`);
     } finally {
@@ -351,7 +364,7 @@ export default function CampaignDetail() {
         const briefPosts = posts.filter(p => p.post_type === 'BRIEF');
         const contentPosts = posts.filter(p => p.post_type !== 'BRIEF');
         const renderRow = (p) => (
-          <div key={p.id} className="grid grid-cols-[1.5fr_80px_1fr_1fr_100px_24px_24px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
+          <div key={p.id} className="grid grid-cols-[1.5fr_80px_70px_1fr_1fr_100px_24px_24px] py-2.5 border-t border-slate-100 first:border-t-0 items-center gap-2 text-xs">
             <div>
               <div className="font-medium">{p.title}</div>
               {p.visual_template && <div className="text-[10px] text-slate-400 mt-0.5">🎨 {p.visual_template}</div>}
@@ -360,6 +373,7 @@ export default function CampaignDetail() {
               )}
             </div>
             <span className="text-slate-400">{formatDateShort(p.scheduled_at)}</span>
+            <span className="text-slate-400 text-[10px] truncate">{p.operator_email?.split('@')[0] || '—'}</span>
             <span className="text-slate-500">{p.status === 'posted' ? `${p.st_seen} seen / ${p.st_react} react` : '—'}</span>
             <span className="text-slate-500">{p.status === 'posted' ? `${p.web_views} views` : '—'}</span>
             <StatusDropdown post={p} onChanged={load} />
@@ -501,7 +515,7 @@ export default function CampaignDetail() {
         );
       })()}
 
-      {campaign.type === 'giai_dau' && <TournamentPanel campaignId={id} />}
+      {campaign.type === 'giai_dau' && <TournamentPanel campaign={campaign} campaignId={id} />}
 
       <EventMetricsPanel campaign={campaign} onLinked={load} />
 
@@ -519,6 +533,26 @@ export default function CampaignDetail() {
             {seatalkLoading ? 'Đang tải...' : '🔍 Xem lịch hôm nay'}
           </button>
         </div>
+        <div className="mb-3">
+          <div className="text-[10px] text-slate-400 mb-1 font-bold">WEBHOOK URL (GROUP SEATALK)</div>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={webhookUrl}
+              onChange={e => setWebhookUrl(e.target.value)}
+              placeholder="https://openapi.seatalk.io/webhook/..."
+              className="flex-1 text-[12px] border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400"
+            />
+            <button
+              onClick={handleSaveWebhook}
+              disabled={webhookSaving}
+              className="text-xs bg-blue-500 text-white font-bold rounded-lg px-3 py-2 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              {webhookSaving ? '...' : 'Lưu'}
+            </button>
+          </div>
+          <div className="text-[10px] text-slate-400 mt-1">Lấy URL trong SeaTalk group → Settings → Integrations → Incoming Webhook</div>
+        </div>
         {seatalkText && (
           <div className="bg-slate-50 rounded-lg p-3 mb-3 text-[12px] font-mono whitespace-pre-wrap text-slate-700 max-h-[220px] overflow-y-auto border border-slate-200">
             {seatalkText}
@@ -528,7 +562,7 @@ export default function CampaignDetail() {
           <div className="flex gap-2">
             <button
               onClick={handleSendSeatalk}
-              disabled={seatalkLoading}
+              disabled={seatalkLoading || !webhookUrl}
               className="bg-[#4CAF50] text-white text-xs font-bold rounded-lg px-4 py-2 cursor-pointer disabled:opacity-50"
             >
               ✓ Gửi lên SeaTalk
@@ -541,8 +575,11 @@ export default function CampaignDetail() {
             </button>
           </div>
         )}
+        {!webhookUrl && seatalkText && (
+          <div className="text-[10px] text-amber-600 mt-1">⚠️ Chưa có Webhook URL — điền vào ô trên để gửi được</div>
+        )}
         {seatalkSent && <div className="text-xs text-green-700 mt-2 font-medium">{seatalkSent}</div>}
-        <div className="text-[10px] text-slate-400 mt-2">Cron tự gửi mỗi ngày 08:00 ICT nếu có SEATALK_WEBHOOK_URL. Nhấn "Xem lịch hôm nay" để review trước khi gửi thủ công.</div>
+        <div className="text-[10px] text-slate-400 mt-2">Cron tự gửi mỗi ngày 08:00 ICT. Mỗi campaign gửi đến group riêng của mình.</div>
       </div>
 
       {/* Danger zone: delete campaign */}

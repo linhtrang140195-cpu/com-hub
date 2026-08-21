@@ -126,7 +126,7 @@ router.post('/', requireAdmin, async (req, res) => {
 });
 
 router.patch('/:id', requireAdmin, async (req, res) => {
-  const fields = ['name', 'type', 'status', 'website', 'tone', 'slogan', 'color', 'priority'];
+  const fields = ['name', 'type', 'status', 'website', 'tone', 'slogan', 'color', 'priority', 'seatalk_webhook_url'];
   const dateFields = ['start_date', 'end_date'];
   const sets = [];
   const values = [];

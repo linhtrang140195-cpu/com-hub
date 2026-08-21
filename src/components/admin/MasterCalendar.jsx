@@ -1,4 +1,4 @@
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { formatDateShort } from '../../utils/datetime';
 import { detectCampaignOverlaps } from '../../utils/campaignOverlap';
 
@@ -13,6 +13,7 @@ const PRIORITY_INFO = {
 
 export default function MasterCalendar() {
   const { campaigns } = useOutletContext();
+  const navigate = useNavigate();
   const visible = campaigns.filter(c => c.status !== 'archived');
 
   const now = Date.now();
@@ -75,7 +76,11 @@ export default function MasterCalendar() {
         {inWindow.map(c => {
           const pInfo = PRIORITY_INFO[c.priority] || PRIORITY_INFO.medium;
           return (
-            <div key={c.id} className="py-2.5 border-t border-slate-100 first:border-t-0">
+            <div
+              key={c.id}
+              className="py-2.5 border-t border-slate-100 first:border-t-0 cursor-pointer hover:bg-slate-50 rounded-lg px-2 -mx-2 transition-colors"
+              onClick={() => navigate(`/admin/campaigns/${c.id}`)}
+            >
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
                 <span className="text-[13px] font-semibold">{c.name}</span>

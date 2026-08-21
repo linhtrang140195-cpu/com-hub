@@ -380,6 +380,12 @@ export default function NewCampaignModal({ onClose, onCreated }) {
                   onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                   className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-[13px] outline-none"
                 />
+                {key === 'website' && selectedType?.key === 'giai_dau' && (
+                  <div className="mt-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                    🏆 <strong>Giải đấu có web riêng?</strong> Dán link vào đây (VD: <code>https://dcvp.run.ingarena.net</code>). Sau khi tạo, vào Campaign Detail → "🔄 Đồng bộ từ web" để xem lịch + kết quả realtime và "💡 Gợi ý bài tiếp theo" để AI gợi ý content.<br/>
+                    <span className="text-slate-500">Nếu chỉ có Google Sheet (Sea-only): để trống, sau đó dùng Apps Script trong sheet để sync — xem memory <em>tournament-sync-approach</em>.</span>
+                  </div>
+                )}
               </div>
             ))}
 

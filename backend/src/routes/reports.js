@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { syncSeason } from '../services/nhaiDaySync.js';
+import xlsx from 'xlsx';
 
 const router = Router();
 router.use(requireAdmin);
@@ -81,6 +82,58 @@ router.get('/campaign/:id', async (req, res) => {
     top_posts: topPosts,
     by_post_type: byType,
   });
+});
+
+router.get('/campaign/:id/export', async (req, res) => {
+  const { rows: [campaign] } = await query('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
+  if (!campaign) return res.status(404).json({ error: 'Not found' });
+  const { rows: posts } = await query('SELECT * FROM posts WHERE campaign_id = ? ORDER BY scheduled_at', [req.params.id]);
+
+  const posted = posts.filter(p => p.status === 'posted');
+  const sum = (arr, key) => arr.reduce((a, p) => a + (p[key] || 0), 0);
+  const avg = (arr, key) => arr.length ? Math.round(sum(arr, key) / arr.length) : 0;
+
+  const wb = xlsx.utils.book_new();
+
+  // Sheet 1: Tổng quan
+  const overviewData = [
+    ['Campaign', campaign.name],
+    ['Bắt đầu', campaign.start_date ? new Date(campaign.start_date).toLocaleDateString('vi-VN') : ''],
+    ['Kết thúc', campaign.end_date ? new Date(campaign.end_date).toLocaleDateString('vi-VN') : ''],
+    ['Trạng thái', campaign.status],
+    [],
+    ['Tổng bài', posts.length],
+    ['Đã đăng', posted.length],
+    ['Completion rate', posts.length ? `${Math.round((posted.length / posts.length) * 100)}%` : '0%'],
+    ['Avg Seen/bài', avg(posted, 'st_seen')],
+    ['Avg React/bài', avg(posted, 'st_react')],
+    ['Avg Reply/bài', avg(posted, 'st_reply')],
+    ['Total Web Views', sum(posted, 'web_views')],
+  ];
+  const ws1 = xlsx.utils.aoa_to_sheet(overviewData);
+  xlsx.utils.book_append_sheet(wb, ws1, 'Tổng quan');
+
+  // Sheet 2: Chi tiết bài viết
+  const detailHeaders = ['Ngày đăng', 'Tiêu đề', 'Loại bài', 'Kênh', 'Operator', 'Trạng thái', 'Seen', 'React', 'Web Views'];
+  const detailRows = posts.map(p => [
+    p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
+    p.title || '',
+    p.post_type || '',
+    Array.isArray(p.channels) ? p.channels.join(', ') : (typeof p.channels === 'string' ? JSON.parse(p.channels || '[]').join(', ') : ''),
+    p.operator_email || '',
+    p.status || '',
+    p.st_seen || 0,
+    p.st_react || 0,
+    p.web_views || 0,
+  ]);
+  const ws2 = xlsx.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
+  xlsx.utils.book_append_sheet(wb, ws2, 'Chi tiết bài viết');
+
+  const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const safeName = campaign.name.replace(/[^a-zA-Z0-9_\-\s]/g, '').trim() || 'campaign';
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName)}.xlsx"`);
+  res.send(buf);
 });
 
 router.get('/year/:year', async (req, res) => {

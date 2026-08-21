@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { isToday, formatTimeVN } from '../../utils/datetime';
+import { formatTimeVN } from '../../utils/datetime';
 import { getPostStatusInfo } from '../../utils/postStatus';
 import ProgressBar from '../shared/ProgressBar';
 import Badge from '../shared/Badge';
@@ -15,8 +15,11 @@ export default function TodayChecklist() {
   const [loading, setLoading] = useState(true);
 
   const load = () => {
-    api.get(`/posts?operator=${user.email}`)
-      .then(all => setPosts(all.filter(p => isToday(p.scheduled_at))))
+    const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+    const from = encodeURIComponent(`${todayKey}T00:00:00+07:00`);
+    const to = encodeURIComponent(`${todayKey}T23:59:59+07:00`);
+    api.get(`/posts?from=${from}&to=${to}`)
+      .then(all => setPosts(all))
       .catch(console.error)
       .finally(() => setLoading(false));
   };

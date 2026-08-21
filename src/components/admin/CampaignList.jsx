@@ -9,6 +9,7 @@ export default function CampaignList() {
   const [types, setTypes] = useState([]);
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     api.get('/campaign-types').then(all => setTypes(all.filter(t => t.key !== 'lnd'))).catch(console.error);
@@ -23,16 +24,16 @@ export default function CampaignList() {
   const typeInfo = useMemo(() => Object.fromEntries(types.map(t => [t.key, t])), [types]);
 
   const visible = campaigns.filter(c =>
-    c.status !== 'archived' &&
     String(new Date(c.start_date).getFullYear()) === year &&
-    (typeFilter === 'all' || c.type === typeFilter)
+    (typeFilter === 'all' || c.type === typeFilter) &&
+    (statusFilter === 'all' ? c.status !== 'archived' : c.status === statusFilter)
   );
 
   return (
     <div>
       <div className="text-[22px] font-extrabold mb-4">🗂️ Tất cả campaigns</div>
 
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
         <select
           value={year}
           onChange={e => setYear(e.target.value)}
@@ -40,6 +41,25 @@ export default function CampaignList() {
         >
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
+        {[
+          { key: 'all', label: 'Tất cả' },
+          { key: 'active', label: '🟢 Đang chạy' },
+          { key: 'draft', label: '🟡 Draft' },
+          { key: 'archived', label: '⚫ Lưu trữ' },
+        ].map(s => (
+          <button
+            key={s.key}
+            onClick={() => setStatusFilter(s.key)}
+            className="text-xs font-bold rounded-full px-3 py-1.5 cursor-pointer border transition-colors"
+            style={{
+              background: statusFilter === s.key ? '#1A1A2E' : '#F0F0F5',
+              color: statusFilter === s.key ? '#fff' : '#555',
+              borderColor: 'transparent',
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5">

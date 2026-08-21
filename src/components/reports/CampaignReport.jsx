@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../../services/api';
 
+async function downloadExcel(campaignId, campaignName) {
+  const blob = await api.getBlob(`/reports/campaign/${campaignId}/export`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${campaignName || 'campaign'}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function CampaignReport() {
   const { campaignId } = useParams();
   const [data, setData] = useState(null);
@@ -17,11 +27,29 @@ export default function CampaignReport() {
   if (!data) return <div className="text-sm text-slate-400">Đang tải...</div>;
   const { campaign, summary, engagement, top_posts, by_post_type } = data;
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try { await downloadExcel(campaignId, campaign.name); }
+    catch (e) { alert('Lỗi xuất Excel: ' + e.message); }
+    finally { setExporting(false); }
+  };
+
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-2.5 h-2.5 rounded-full" style={{ background: campaign.color }} />
-        <div className="text-[22px] font-extrabold">{campaign.name} — Report</div>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: campaign.color }} />
+          <div className="text-[22px] font-extrabold">{campaign.name} — Report</div>
+        </div>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex items-center gap-1.5 text-[13px] font-bold bg-[#1A1A2E] text-white px-4 py-2 rounded-lg hover:bg-[#252542] disabled:opacity-50 cursor-pointer"
+        >
+          {exporting ? '⏳ Đang xuất...' : '📥 Xuất Excel'}
+        </button>
       </div>
 
       <div className="grid grid-cols-4 gap-3 mb-6">

@@ -61,6 +61,7 @@ async function runMigrations() {
     { name: 'campaigns.priority', sql: `ALTER TABLE campaigns ADD COLUMN priority VARCHAR(16) NOT NULL DEFAULT 'medium' AFTER status` },
     { name: 'posts.external_id', sql: 'ALTER TABLE posts ADD COLUMN external_id VARCHAR(64) NULL AFTER phase_id' },
     { name: 'posts.idx_external', sql: 'CREATE INDEX idx_posts_external ON posts (campaign_id, external_id)' },
+    { name: 'campaigns.seatalk_webhook_url', sql: 'ALTER TABLE campaigns ADD COLUMN seatalk_webhook_url VARCHAR(500) NULL AFTER priority' },
     { name: 'monthly_reflections', sql: `CREATE TABLE IF NOT EXISTS monthly_reflections (
       \`year_month\` VARCHAR(7) PRIMARY KEY,
       what_worked TEXT,

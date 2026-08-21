@@ -32,10 +32,8 @@ export function formatWeekdayVN(iso) {
 }
 
 export function isToday(iso) {
-  const now = new Date();
-  const nowVN = new Date(now.toLocaleString('en-US', { timeZone: TZ }));
-  const d = new Date(new Date(iso).toLocaleString('en-US', { timeZone: TZ }));
-  return d.getFullYear() === nowVN.getFullYear() && d.getMonth() === nowVN.getMonth() && d.getDate() === nowVN.getDate();
+  const fmt = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d);
+  return fmt(new Date(iso)) === fmt(new Date());
 }
 
 export function toDatetimeLocalValue(iso) {
@@ -49,4 +47,39 @@ export function toDatetimeLocalValue(iso) {
 export function fromDatetimeLocalValue(value) {
   // value like "2026-08-17T12:45" interpreted as Asia/Ho_Chi_Minh (+07:00)
   return `${value}:00+07:00`;
+}
+
+// Returns Monday 00:00:00 local time of the week containing `date`, shifted by `offsetWeeks`.
+export function startOfWeek(date, offsetWeeks = 0) {
+  const vnStr = new Date(date).toLocaleString('en-US', { timeZone: TZ });
+  const d = new Date(vnStr);
+  const dow = d.getDay(); // 0=Sun
+  const diff = dow === 0 ? -6 : 1 - dow; // Monday-based
+  d.setDate(d.getDate() + diff + offsetWeeks * 7);
+  d.setHours(0, 0, 0, 0);
+  // Reconstruct as UTC time that equals 00:00 VN
+  const isoDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return new Date(`${isoDate}T00:00:00+07:00`);
+}
+
+export function addDays(date, n) {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d;
+}
+
+export function isSameDayVN(a, b) {
+  const toKey = iso => {
+    const s = new Date(iso).toLocaleString('en-US', { timeZone: TZ });
+    const d = new Date(s);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+  return toKey(a) === toKey(b);
+}
+
+export function toDateInputValue(date) {
+  const s = new Date(date).toLocaleString('en-US', { timeZone: TZ });
+  const d = new Date(s);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }

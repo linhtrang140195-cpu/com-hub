@@ -28,7 +28,7 @@ import reportRoutes from './routes/reports.js';
 import seatalkRoutes from './routes/seatalk.js';
 import tournamentRoutes from './routes/tournament.js';
 import reflectionRoutes from './routes/reflections.js';
-import { sendWebhookReminder } from './services/seatalkReminder.js';
+import { sendWebhookReminder, sendWeeklyWebhookReminder } from './services/seatalkReminder.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 
 const app = express();
@@ -87,6 +87,16 @@ async function start() {
       console.log('[seatalk-cron]', result);
     } catch (e) {
       console.error('[seatalk-cron] error', e.message);
+    }
+  }, { timezone: 'Asia/Ho_Chi_Minh' });
+
+  // Weekly digest every Monday at 08:00 ICT
+  cron.schedule('0 8 * * 1', async () => {
+    try {
+      const result = await sendWeeklyWebhookReminder();
+      console.log('[seatalk-weekly-cron]', result);
+    } catch (e) {
+      console.error('[seatalk-weekly-cron] error', e.message);
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
 

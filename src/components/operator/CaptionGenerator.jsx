@@ -50,6 +50,7 @@ export default function CaptionGenerator() {
   const [provider, setProvider] = useState('claude');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [compassLoading, setCompassLoading] = useState(false);
   const [error, setError] = useState('');
   const [copiedField, setCopiedField] = useState('');
   const [upcoming, setUpcoming] = useState([]);
@@ -112,13 +113,17 @@ export default function CaptionGenerator() {
 
       let output;
       if (needsAI) {
-        output = await api.post('/caption/generate', {
-          campaign_id: campaign.id,
-          post_type: postType,
-          inputs,
-          date: post?.scheduled_at || new Date().toISOString(),
-          provider,
-        });
+        if (provider === 'compass' && post) {
+          output = await api.post('/caption/compass-suggest', { post_id: post.id });
+        } else {
+          output = await api.post('/caption/generate', {
+            campaign_id: campaign.id,
+            post_type: postType,
+            inputs,
+            date: post?.scheduled_at || new Date().toISOString(),
+            provider,
+          });
+        }
       } else {
         output = generateTemplateCaption(postType, inputs, campaign);
       }
@@ -142,6 +147,20 @@ export default function CaptionGenerator() {
   const handleCopy = async (field, text) => {
     const ok = await copyText(text);
     if (ok) { setCopiedField(field); setTimeout(() => setCopiedField(''), 2000); }
+  };
+
+  const handleCompassSuggest = async () => {
+    if (!post) return;
+    setCompassLoading(true);
+    setError('');
+    try {
+      const output = await api.post('/caption/compass-suggest', { post_id: post.id });
+      setResult(output);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCompassLoading(false);
+    }
   };
 
   const [savedDraft, setSavedDraft] = useState(false);
@@ -209,6 +228,19 @@ export default function CaptionGenerator() {
               Hoặc viết tự do không theo lịch có sẵn →
             </button>
           )}
+        </div>
+      )}
+
+      {post && (
+        <div className="mb-4">
+          <button
+            onClick={handleCompassSuggest}
+            disabled={compassLoading}
+            className="w-full border-2 border-dashed border-[#E94560] rounded-lg py-2.5 text-[13px] text-[#E94560] font-bold cursor-pointer disabled:opacity-50 hover:bg-red-50 transition-colors"
+          >
+            {compassLoading ? '⏳ Compass đang gợi ý...' : '✨ AI Suggest — Compass tự sinh caption nhanh'}
+          </button>
+          <div className="text-[10px] text-slate-400 text-center mt-1">Dựa trên tiêu đề bài + tone campaign, không cần điền thêm</div>
         </div>
       )}
 
@@ -372,6 +404,17 @@ export default function CaptionGenerator() {
             >
               🟢 ChatGPT
             </button>
+            <button
+              onClick={() => setProvider('compass')}
+              className="rounded-full px-3.5 py-1.5 text-xs cursor-pointer"
+              style={{
+                background: provider === 'compass' ? '#E94560' : '#F0F0F5',
+                color: provider === 'compass' ? '#fff' : '#555',
+                fontWeight: provider === 'compass' ? 700 : 400,
+              }}
+            >
+              🧭 Compass
+            </button>
           </div>
         </div>
 
@@ -396,7 +439,12 @@ export default function CaptionGenerator() {
                 {copiedField === 'seatalk' ? '✓ Đã copy' : 'Copy'}
               </button>
             </div>
-            <pre className="text-[13px] whitespace-pre-wrap font-sans">{result.seatalk}</pre>
+            <textarea
+              value={result.seatalk}
+              onChange={e => setResult(r => ({ ...r, seatalk: e.target.value }))}
+              className="w-full text-[13px] font-sans border border-slate-100 rounded-lg p-2 outline-none resize-none focus:border-slate-300 bg-slate-50"
+              rows={Math.max(4, (result.seatalk || '').split('\n').length + 1)}
+            />
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <div className="flex justify-between items-center mb-2.5">
@@ -405,7 +453,12 @@ export default function CaptionGenerator() {
                 {copiedField === 'web' ? '✓ Đã copy' : 'Copy'}
               </button>
             </div>
-            <pre className="text-[13px] whitespace-pre-wrap font-sans">{result.web}</pre>
+            <textarea
+              value={result.web}
+              onChange={e => setResult(r => ({ ...r, web: e.target.value }))}
+              className="w-full text-[13px] font-sans border border-slate-100 rounded-lg p-2 outline-none resize-none focus:border-slate-300 bg-slate-50"
+              rows={Math.max(3, (result.web || '').split('\n').length + 1)}
+            />
           </div>
           {result.suggested_cta && (
             <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 text-xs text-amber-700">
