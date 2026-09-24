@@ -27,6 +27,7 @@ function safeParse(s) {
 export default function StatInput({ post, onSaved }) {
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState({});
+  const [liveLink, setLiveLink] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Only the fields that apply to this post: its own channels, plus whatever
@@ -47,6 +48,7 @@ export default function StatInput({ post, onSaved }) {
       }
     }
     setValues(seed);
+    setLiveLink(post.live_link || '');
     setOpen(true);
   };
 
@@ -58,7 +60,7 @@ export default function StatInput({ post, onSaved }) {
         const [channel, key] = path.split('.');
         (metrics[channel] ||= {})[key] = Number(v) || 0;
       }
-      await api.patch(`/posts/${post.id}`, { metrics });
+      await api.patch(`/posts/${post.id}`, { metrics, live_link: liveLink.trim() });
       setOpen(false);
       onSaved?.();
     } finally {
@@ -113,6 +115,22 @@ export default function StatInput({ post, onSaved }) {
           </div>
         </div>
       ))}
+      {/* The published URL. Stored in live_link, which already existed but had
+          no input anywhere, so nobody could fill it. It is the exact
+          identifier any Sailor/Web analytics pull will match a post on. */}
+      <label className="flex items-center gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 w-[74px] shrink-0">
+          Link bài đăng
+        </span>
+        <input
+          type="url"
+          value={liveLink}
+          onChange={e => setLiveLink(e.target.value)}
+          placeholder="Dán link bài đã đăng (Sailor / Web) — để đối chiếu số sau này"
+          className="flex-1 min-w-[240px] border border-slate-200 rounded px-2 py-1 text-[11px] focus:border-[#4B6FE0] outline-none"
+        />
+      </label>
+
       <div className="flex gap-3 items-center">
         <button
           onClick={handleSave}
