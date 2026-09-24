@@ -29,6 +29,7 @@ import seatalkRoutes from './routes/seatalk.js';
 import tournamentRoutes from './routes/tournament.js';
 import reflectionRoutes from './routes/reflections.js';
 import publicTimelineRoutes from './routes/publicTimeline.js';
+import settingsRoutes from './routes/settings.js';
 import { sendWebhookReminder, sendWeeklyWebhookReminder } from './services/seatalkReminder.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 import { syncPostsFromWebsite } from './services/tournamentService.js';
@@ -64,6 +65,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/seatalk', seatalkRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/reflections', reflectionRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Serve the built frontend (single container — no CORS needed in production)
 if (fs.existsSync(PUBLIC_DIR)) {

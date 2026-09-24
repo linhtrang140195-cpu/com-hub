@@ -81,6 +81,14 @@ async function runMigrations() {
     // 'ic'   = a request for the IC team to write and publish it
     // 'self' = the submitter publishes it themselves, registered here to avoid clashes
     { name: 'posts.post_owner', sql: "ALTER TABLE posts ADD COLUMN post_owner VARCHAR(16) NULL AFTER series_id" },
+    // Admin-editable config that used to live only in env vars (e.g. the team
+    // SeaTalk webhook), so it can be changed without a redeploy.
+    { name: 'app_settings', sql: `CREATE TABLE IF NOT EXISTS app_settings (
+      \`key\`      VARCHAR(64) PRIMARY KEY,
+      value      TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      updated_by VARCHAR(255)
+    )` },
   ];
   const conn = await pool.getConnection();
   try {

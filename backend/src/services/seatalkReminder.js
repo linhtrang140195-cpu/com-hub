@@ -1,4 +1,5 @@
 import { query } from '../db.js';
+import { getTeamWebhook } from './settings.js';
 
 export async function getTodaySchedule() {
   const tz = 'Asia/Ho_Chi_Minh';
@@ -14,6 +15,7 @@ export async function getTodaySchedule() {
   const { rows } = await query(
     `SELECT p.id, p.title, p.post_type, p.scheduled_at, p.status, p.approval_status,
             p.operator_email, p.channels, p.visual_template, p.live_link, p.brief_design,
+            p.submitted_by, p.post_owner,
             c.id AS campaign_id, c.name AS campaign_name, c.color AS campaign_color,
             c.website AS campaign_website, c.seatalk_webhook_url AS campaign_webhook_url
      FROM posts p
@@ -44,8 +46,9 @@ export function formatReminderText(posts) {
     byCampaign[p.campaign_name].push(p);
   }
 
+  const icCount = posts.filter(p => p.post_owner === 'ic').length;
   let msg = `📅 Lịch hôm nay — ${dateStr}\n`;
-  msg += `(${posts.length} bài • Comms Hub)\n`;
+  msg += `(${posts.length} bài${icCount ? ` • ${icCount} bài IC phụ trách` : ''} • Comms Hub)\n`;
 
   for (const [campaign, items] of Object.entries(byCampaign)) {
     msg += `\n🎯 ${campaign}\n`;
@@ -53,10 +56,11 @@ export function formatReminderText(posts) {
       const time = new Date(p.scheduled_at).toLocaleTimeString('vi-VN', {
         hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh',
       });
-      const operator = p.operator_email?.split('@')[0] || '—';
+      const operator = p.submitted_by || p.operator_email?.split('@')[0] || '—';
       const channels = Array.isArray(p.channels) ? p.channels.join(', ') : (p.channels || '');
       const icon = p.status === 'posted' ? '✅' : p.approval_status === 'da_duyet' ? '🔵' : '⏳';
-      msg += `${icon} [${time}] ${p.title} — @${operator}`;
+      const owner = p.post_owner === 'ic' ? ' 🔴 IC đăng' : '';
+      msg += `${icon} [${time}] ${p.title} — @${operator}${owner}`;
       if (channels) msg += ` (${channels})`;
       msg += '\n';
       if (p.brief_design) msg += `   🎨 Brief: ${p.brief_design}\n`;
@@ -81,7 +85,7 @@ export async function sendWebhookReminder() {
   const posts = await getTodaySchedule();
   if (!posts.length) return { ok: true, count: 0 };
 
-  const globalUrl = process.env.SEATALK_WEBHOOK_URL;
+  const globalUrl = await getTeamWebhook();
 
   // Group posts by their campaign's webhook URL (or global fallback for those without one)
   const byUrl = new Map();
@@ -105,7 +109,7 @@ export async function sendWebhookReminder() {
 
 export async function sendCampaignWebhookReminder(campaignId, customText) {
   const { rows: campaigns } = await query('SELECT seatalk_webhook_url FROM campaigns WHERE id = ?', [campaignId]);
-  const webhookUrl = campaigns[0]?.seatalk_webhook_url || process.env.SEATALK_WEBHOOK_URL;
+  const webhookUrl = campaigns[0]?.seatalk_webhook_url || await getTeamWebhook();
   if (!webhookUrl) return { ok: false, reason: 'Campaign chưa có SeaTalk Webhook URL' };
 
   let text = customText;
@@ -189,7 +193,7 @@ export async function sendWeeklyWebhookReminder() {
   const { rows: posts, monday, sunday } = await getWeekSchedule();
   if (!posts.length) return { ok: true, count: 0 };
 
-  const globalUrl = process.env.SEATALK_WEBHOOK_URL;
+  const globalUrl = await getTeamWebhook();
 
   const byUrl = new Map();
   for (const p of posts) {

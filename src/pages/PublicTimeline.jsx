@@ -345,6 +345,8 @@ export default function PublicTimeline() {
         ) : (
           <HistoryTable rows={history} />
         )}
+
+        {isAdmin && <TeamWebhookPanel />}
       </div>
 
       {addFor && (
@@ -716,6 +718,93 @@ function Chip({ on, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+/* ── Team webhook (admin only) ───────────────────────── */
+function TeamWebhookPanel() {
+  const [url, setUrl] = useState('');
+  const [envFallback, setEnvFallback] = useState(false);
+  const [state, setState] = useState('');   // '' | 'saving' | 'saved' | 'testing' | 'sent'
+  const [err, setErr] = useState('');
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    api.get('/settings/team-webhook')
+      .then(d => { setUrl(d.url || ''); setEnvFallback(Boolean(d.env_fallback)); })
+      .catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setState('saving'); setErr('');
+    try {
+      await api.patch('/settings/team-webhook', { url });
+      setState('saved');
+      setTimeout(() => setState(''), 2200);
+    } catch (e) { setErr(e.message); setState(''); }
+  };
+
+  const test = async () => {
+    setState('testing'); setErr('');
+    try {
+      await api.post('/settings/team-webhook/test', {});
+      setState('sent');
+      setTimeout(() => setState(''), 2600);
+    } catch (e) { setErr(e.message); setState(''); }
+  };
+
+  return (
+    <div className="mt-3 bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-5 py-3 text-left cursor-pointer hover:bg-slate-50"
+      >
+        <span className="text-[13px] font-extrabold">⚙️ Bot gửi SeaTalk</span>
+        <span className={`text-[10px] font-bold uppercase rounded px-1.5 py-px ${
+          url || envFallback ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+        }`}>
+          {url ? 'Đã cấu hình' : envFallback ? 'Đang dùng env var' : 'Chưa cấu hình'}
+        </span>
+        <span className="ml-auto text-slate-400 text-[12px]">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-4 pt-1 border-t border-slate-100 flex flex-col gap-2.5">
+          <div className="text-[11.5px] text-slate-500 leading-relaxed">
+            Digest 08:00 mỗi sáng gửi vào group này cho các campaign chưa có webhook riêng.
+            Lấy URL: group SeaTalk → <b>Settings → Integrations → Incoming Webhook</b>.
+            Chỉ admin thấy ô này.
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <input
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              placeholder="https://openapi.seatalk.io/webhook/group/..."
+              className="flex-1 min-w-[280px] border border-slate-200 rounded-lg px-3 py-2 text-[12.5px] font-mono outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
+            />
+            <button
+              onClick={save}
+              disabled={state === 'saving'}
+              className={`rounded-lg px-4 py-2 text-[12.5px] font-bold text-white cursor-pointer disabled:opacity-50 ${
+                state === 'saved' ? 'bg-emerald-600' : 'bg-[#14161F] hover:bg-[#2A2D3A]'
+              }`}
+            >
+              {state === 'saving' ? 'Đang lưu…' : state === 'saved' ? '✓ Đã lưu' : 'Lưu'}
+            </button>
+            <button
+              onClick={test}
+              disabled={state === 'testing' || (!url && !envFallback)}
+              className={`rounded-lg px-4 py-2 text-[12.5px] font-bold border cursor-pointer disabled:opacity-50 ${
+                state === 'sent' ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-slate-200 hover:border-slate-400'
+              }`}
+            >
+              {state === 'testing' ? 'Đang gửi…' : state === 'sent' ? '✓ Đã gửi!' : '🔔 Gửi thử'}
+            </button>
+          </div>
+          {err && <div className="text-[12px] font-semibold text-[#E94560] bg-red-50 rounded-lg px-3 py-2">{err}</div>}
+        </div>
+      )}
+    </div>
   );
 }
 
