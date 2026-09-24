@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query, newId } from '../db.js';
-import { getIcRequestWebhook } from '../services/settings.js';
+import { getIcRequestWebhook, getTeamWebhook } from '../services/settings.js';
 import { detectConflicts } from '../services/conflictDetect.js';
 
 const IC_BRIEF_FORM = 'https://forms.gle/fSP29o5daJKDje2G6';
@@ -133,9 +133,11 @@ router.get('/meta', async (_req, res) => {
   );
   // Post types are a curated list in the UI, not harvested from existing rows —
   // the imported plans carry too many one-off values to pick from.
+  // Only whether a destination exists, never the URL: the board is public.
   res.json({
     campaigns: rows,
     channels: ['SeaTalk', 'Email', 'Web', 'Sailor', 'Facebook', 'TikTok'],
+    notifications_ready: Boolean(await getTeamWebhook()),
   });
 });
 

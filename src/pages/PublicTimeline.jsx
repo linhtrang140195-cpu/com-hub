@@ -411,7 +411,15 @@ export default function PublicTimeline() {
               </div>
             </div>
 
-            <div className="mt-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-[11.5px] text-slate-500 flex items-center gap-4 flex-wrap">
+            {/* Self-clearing: disappears once a webhook is configured. */}
+          {meta.notifications_ready === false && (
+            <div className="mt-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-900 leading-relaxed">
+              🔔 <b>Tính năng tự động gửi thông báo vào group đang được admin cấu hình.</b>{' '}
+              Trong lúc chờ, dùng nút <b>Copy lịch hôm nay</b> / <b>Copy lịch tuần</b> ở trên rồi dán vào SeaTalk.
+            </div>
+          )}
+
+          <div className="mt-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-[11.5px] text-slate-500 flex items-center gap-4 flex-wrap">
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Bài của bạn
               </span>
