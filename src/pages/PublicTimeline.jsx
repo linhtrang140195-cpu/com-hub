@@ -13,7 +13,7 @@ const IC_BRIEF_FORM = 'https://forms.gle/fSP29o5daJKDje2G6';
 // Deliberately short, curated lists. Deriving these from existing posts dragged
 // in years of one-off values from the Excel imports ("SeaTalk/ Web/ Sailor",
 // "XKÊ", "→ Design / AI") and buried the few that people actually pick.
-const POST_TYPES = ['Announce', 'Event', 'Engagement', 'Reminder'];
+const POST_TYPES = ['Announce', 'Event', 'Engagement', 'Reminder', 'Business update', 'Seeding'];
 const CAMPAIGN_GROUPS = ['Event', 'L&D', 'HR', 'Văn hoá', 'Giải đấu', 'IC'];
 const FALLBACK_CHANNELS = ['SeaTalk', 'Email', 'Web', 'Sailor', 'Facebook', 'TikTok'];
 
