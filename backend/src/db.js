@@ -78,6 +78,9 @@ async function runMigrations() {
     { name: 'posts.submitted_by', sql: 'ALTER TABLE posts ADD COLUMN submitted_by VARCHAR(255) NULL AFTER public_key' },
     { name: 'posts.series_id', sql: 'ALTER TABLE posts ADD COLUMN series_id VARCHAR(64) NULL AFTER submitted_by' },
     { name: 'posts.idx_public', sql: 'CREATE INDEX idx_posts_public ON posts (public_key)' },
+    // 'ic'   = a request for the IC team to write and publish it
+    // 'self' = the submitter publishes it themselves, registered here to avoid clashes
+    { name: 'posts.post_owner', sql: "ALTER TABLE posts ADD COLUMN post_owner VARCHAR(16) NULL AFTER series_id" },
   ];
   const conn = await pool.getConnection();
   try {

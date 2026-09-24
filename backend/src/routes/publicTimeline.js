@@ -19,6 +19,16 @@ function validKey(k) {
   return typeof k === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(k);
 }
 
+// attachUser already ran on /api, so a logged-in admin hitting these open
+// endpoints is recognised and may rearrange anyone's slot.
+function isAdmin(req) {
+  return req.user?.role === 'admin';
+}
+
+function normaliseOwner(v) {
+  return v === 'ic' ? 'ic' : 'self';
+}
+
 // "2026-09-24" + "09:00" -> a real instant, read as Vietnam local time.
 function vnInstant(dateStr, timeStr) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
@@ -85,14 +95,17 @@ router.get('/posts', async (req, res) => {
   const { rows } = await query(
     `SELECT p.id, p.scheduled_at, p.post_type, p.title, p.channels, p.status,
             p.public_key, p.submitted_by, p.series_id, p.operator_email, p.posted_at,
-            p.live_link, p.st_seen, p.st_react, p.web_views,
+            p.post_owner, p.live_link, p.st_seen, p.st_react, p.web_views,
             c.name AS campaign_name, c.color AS campaign_color
      FROM posts p JOIN campaigns c ON c.id = p.campaign_id
      WHERE ${clauses.join(' AND ')}
      ORDER BY p.scheduled_at ASC`,
     params
   );
-  res.json(rows.map(r => ({ ...r, channels: r.channels || [] })));
+  res.json({
+    posts: rows.map(r => ({ ...r, channels: r.channels || [] })),
+    is_admin: isAdmin(req),
+  });
 });
 
 // GET /api/public/history?limit= — everything already posted, newest first
@@ -102,7 +115,7 @@ router.get('/history', async (req, res) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500);
   const { rows } = await query(
     `SELECT p.id, p.scheduled_at, p.posted_at, p.post_type, p.title, p.channels, p.status,
-            p.submitted_by, p.operator_email, p.live_link,
+            p.submitted_by, p.operator_email, p.post_owner, p.live_link,
             p.st_seen, p.st_react, p.web_views,
             c.name AS campaign_name, c.color AS campaign_color
      FROM posts p JOIN campaigns c ON c.id = p.campaign_id
@@ -144,6 +157,7 @@ router.post('/posts', async (req, res) => {
   const post_type = clean(b.post_type, 128) || 'POST';
   const channels = Array.isArray(b.channels) ? b.channels.map(c => clean(c, 40)).filter(Boolean) : [];
   const series_id = total > 1 ? newId() : null;
+  const post_owner = normaliseOwner(b.post_owner);
 
   const created = [];
   for (let w = 0; w < weeks; w++) {
@@ -154,10 +168,10 @@ router.post('/posts', async (req, res) => {
         const id = newId();
         await query(
           `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, channels,
-                              status, public_key, submitted_by, series_id)
-           VALUES (?,?,?,?,?,?,'scheduled',?,?,?)`,
+                              status, public_key, submitted_by, series_id, post_owner)
+           VALUES (?,?,?,?,?,?,'scheduled',?,?,?,?)`,
           [id, campaign_id, when, post_type, title, JSON.stringify(channels),
-           b.public_key, submitted_by, series_id]
+           b.public_key, submitted_by, series_id, post_owner]
         );
         created.push(id);
       }
@@ -170,11 +184,14 @@ router.post('/posts', async (req, res) => {
 // PATCH /api/public/posts/:id — submitter edits their own slot
 router.patch('/posts/:id', async (req, res) => {
   const b = req.body || {};
-  if (!validKey(b.public_key)) return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
+  const admin = isAdmin(req);
+  if (!admin && !validKey(b.public_key)) {
+    return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
+  }
 
   const { rows } = await query('SELECT public_key, status FROM posts WHERE id = ?', [req.params.id]);
   if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy bài' });
-  if (rows[0].public_key !== b.public_key) {
+  if (!admin && rows[0].public_key !== b.public_key) {
     return res.status(403).json({ error: 'Chỉ người tạo slot mới sửa được' });
   }
 
@@ -204,22 +221,28 @@ router.patch('/posts/:id', async (req, res) => {
 // DELETE /api/public/posts/:id?key=...&series=1
 router.delete('/posts/:id', async (req, res) => {
   const key = req.query.key;
-  if (!validKey(key)) return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
+  const admin = isAdmin(req);
+  if (!admin && !validKey(key)) {
+    return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
+  }
 
   const { rows } = await query('SELECT public_key, series_id FROM posts WHERE id = ?', [req.params.id]);
   if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy bài' });
-  if (rows[0].public_key !== key) {
+  if (!admin && rows[0].public_key !== key) {
     return res.status(403).json({ error: 'Chỉ người tạo slot mới xoá được' });
   }
 
   if (req.query.series === '1' && rows[0].series_id) {
-    const { rowCount } = await query(
-      'DELETE FROM posts WHERE series_id = ? AND public_key = ?',
-      [rows[0].series_id, key]
-    );
+    const { rowCount } = admin
+      ? await query('DELETE FROM posts WHERE series_id = ?', [rows[0].series_id])
+      : await query('DELETE FROM posts WHERE series_id = ? AND public_key = ?', [rows[0].series_id, key]);
     return res.json({ deleted: rowCount });
   }
-  await query('DELETE FROM posts WHERE id = ? AND public_key = ?', [req.params.id, key]);
+  if (admin) {
+    await query('DELETE FROM posts WHERE id = ?', [req.params.id]);
+  } else {
+    await query('DELETE FROM posts WHERE id = ? AND public_key = ?', [req.params.id, key]);
+  }
   res.json({ deleted: 1 });
 });
 

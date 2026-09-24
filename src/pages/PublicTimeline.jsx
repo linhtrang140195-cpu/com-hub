@@ -7,6 +7,8 @@ import {
 import { copyText } from '../services/clipboard';
 
 const DOW = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+// Brief form the requester fills in when they ask the IC team to write the post.
+const IC_BRIEF_FORM = 'https://forms.gle/fSP29o5daJKDje2G6';
 const FALLBACK_TYPES = ['Preview', 'Result + BXH', 'Highlight', 'Recap ngày', 'Announce', 'Event', 'Story', 'Video', 'LIVE', 'BRIEF Design'];
 const FALLBACK_CHANNELS = ['SeaTalk', 'Email', 'Web', 'Sailor', 'Facebook', 'TikTok'];
 
@@ -53,6 +55,8 @@ export default function PublicTimeline() {
   const [addFor, setAddFor] = useState(null);
   const [digest, setDigest] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [editingTime, setEditingTime] = useState(null); // { id, value }
 
   const weekStart = startOfWeek(new Date(), weekOffset);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -61,7 +65,7 @@ export default function PublicTimeline() {
   const load = useCallback(() => {
     setLoading(true);
     api.get(`/public/posts?from=${weekStart.toISOString()}&to=${weekEnd.toISOString()}`)
-      .then(setPosts)
+      .then(d => { setPosts(d.posts || []); setIsAdmin(Boolean(d.is_admin)); })
       .catch(console.error)
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,6 +104,19 @@ export default function PublicTimeline() {
     } catch (e) { alert(e.message); }
   };
 
+  // Rearranging: keep the slot's date, move it to a new time of day.
+  const handleTimeSave = async (p) => {
+    if (!editingTime || editingTime.id !== p.id) return;
+    const [hh, mm] = editingTime.value.split(':');
+    if (hh == null || mm == null) { setEditingTime(null); return; }
+    const when = `${toDateInputValue(p.scheduled_at)}T${hh}:${mm}:00+07:00`;
+    setEditingTime(null);
+    try {
+      await api.patch(`/public/posts/${p.id}`, { public_key: publicKey, scheduled_at: when });
+      load();
+    } catch (e) { alert(e.message); }
+  };
+
   const handleTogglePosted = async (p) => {
     try {
       await api.patch(`/public/posts/${p.id}`, {
@@ -111,7 +128,13 @@ export default function PublicTimeline() {
   };
 
   const buildDigest = (keys, heading) => {
-    const lines = [heading, ''];
+    const inScope = posts.filter(p => keys.includes(toDateInputValue(p.scheduled_at)));
+    const icCount = inScope.filter(p => p.post_owner === 'ic').length;
+    const lines = [heading];
+    if (inScope.length) {
+      lines.push(`${inScope.length} bài · ${icCount} bài IC phụ trách`);
+    }
+    lines.push('');
     let any = false;
     keys.forEach(k => {
       const rows = posts
@@ -121,7 +144,9 @@ export default function PublicTimeline() {
       any = true;
       if (keys.length > 1) lines.push(`── ${vnDayLabel(k)} ──`);
       rows.forEach(p => {
-        lines.push(`${formatTimeVN(p.scheduled_at)}  ·  ${p.submitted_by || p.operator_email || '—'}  ·  ${p.campaign_name}`);
+        const who = p.submitted_by || p.operator_email || '—';
+        const tag = p.post_owner === 'ic' ? '  [IC đăng]' : '';
+        lines.push(`${formatTimeVN(p.scheduled_at)}  ·  ${who}  ·  ${p.campaign_name}${tag}`);
         lines.push(`   ${p.title}`);
         const tail = [p.post_type, (p.channels || []).join(', ')].filter(Boolean);
         if (tail.length) lines.push(`   [${tail.join(' · ')}]`);
@@ -148,8 +173,13 @@ export default function PublicTimeline() {
             <div className="text-[23px] font-extrabold text-[#14161F] leading-tight">
               Lịch đăng bài chung
             </div>
-            <div className="text-[12.5px] text-slate-500 mt-0.5">
-              Ai cũng điền được — không cần đăng nhập. Bot tổng hợp gửi group mỗi sáng.
+            <div className="text-[12.5px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+              <span>Ai cũng điền được — không cần đăng nhập. Bot tổng hợp gửi group mỗi sáng.</span>
+              {isAdmin && (
+                <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wide bg-[#14161F] text-white rounded px-2 py-0.5">
+                  🔑 Admin
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2.5 bg-[#F6F7FB] border border-slate-200 rounded-xl px-3 py-2">
@@ -267,6 +297,10 @@ export default function PublicTimeline() {
                                   key={p.id}
                                   post={p}
                                   mine={p.public_key === publicKey}
+                                  isAdmin={isAdmin}
+                                  editingTime={editingTime}
+                                  setEditingTime={setEditingTime}
+                                  onTimeSave={() => handleTimeSave(p)}
                                   onDelete={() => handleDelete(p)}
                                   onTogglePosted={() => handleTogglePosted(p)}
                                 />
@@ -294,8 +328,18 @@ export default function PublicTimeline() {
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Bài của bạn
               </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[9px] font-extrabold bg-[#E94560] text-white rounded px-1.5 py-px">IC</span> IC viết &amp; đăng
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[9px] font-extrabold bg-slate-100 text-slate-500 rounded px-1.5 py-px">TỰ</span> Người đăng tự đăng
+              </span>
               <span className="w-px h-3.5 bg-slate-200" />
-              <span>Chỉ sửa/xoá được bài mình tạo. Bấm ✓ khi đã đăng — bài sẽ chuyển sang tab <b className="text-slate-700">Đã đăng</b> và được lưu lại.</span>
+              <span>
+                {isAdmin
+                  ? <>Bạn là <b className="text-slate-700">admin</b> — bấm vào giờ của bất kỳ bài nào để sắp xếp lại, hoặc xoá bài của mọi người.</>
+                  : <>Chỉ sửa/xoá được bài mình tạo. Bấm ✓ khi đã đăng — bài sẽ chuyển sang tab <b className="text-slate-700">Đã đăng</b> và được lưu lại.</>}
+              </span>
             </div>
           </>
         ) : (
@@ -319,21 +363,57 @@ export default function PublicTimeline() {
 }
 
 /* ── Slot card ───────────────────────────────────────── */
-function SlotCard({ post: p, mine, onDelete, onTogglePosted }) {
+function SlotCard({ post: p, mine, isAdmin, editingTime, setEditingTime, onTimeSave, onDelete, onTogglePosted }) {
   const posted = p.status === 'posted';
+  const canEdit = mine || isAdmin;
+  const isIC = p.post_owner === 'ic';
+  const editing = editingTime?.id === p.id;
+
   return (
     <div
       className={`group relative rounded-lg border p-2 pl-2.5 ${posted ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}
       style={{ borderLeft: `3px solid ${p.campaign_color || '#CBD5E1'}` }}
     >
       <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-[12px] font-extrabold tabular-nums">{formatTimeVN(p.scheduled_at)}</span>
-        {p.post_type && (
-          <span className="text-[9.5px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-px truncate max-w-[86px]">
+        {editing ? (
+          <input
+            type="time"
+            value={editingTime.value}
+            onChange={e => setEditingTime(t => ({ ...t, value: e.target.value }))}
+            onKeyDown={e => { if (e.key === 'Enter') onTimeSave(); if (e.key === 'Escape') setEditingTime(null); }}
+            autoFocus
+            className="text-[11px] font-bold tabular-nums border border-[#4B6FE0] rounded px-1 outline-none w-[68px] bg-white"
+          />
+        ) : canEdit ? (
+          <button
+            onClick={() => setEditingTime({ id: p.id, value: formatTimeVN(p.scheduled_at) })}
+            title="Đổi giờ đăng"
+            className="text-[12px] font-extrabold tabular-nums hover:text-[#4B6FE0] hover:underline cursor-pointer"
+          >
+            {formatTimeVN(p.scheduled_at)}
+          </button>
+        ) : (
+          <span className="text-[12px] font-extrabold tabular-nums">{formatTimeVN(p.scheduled_at)}</span>
+        )}
+        {editing && (
+          <button onClick={onTimeSave} className="text-[11px] font-bold text-emerald-600 leading-none px-1 cursor-pointer">✓</button>
+        )}
+        {!editing && (
+          <span
+            className={`text-[9px] font-extrabold uppercase tracking-wide rounded px-1.5 py-px shrink-0 ${
+              isIC ? 'bg-[#E94560] text-white' : 'bg-slate-100 text-slate-500'
+            }`}
+            title={isIC ? 'IC team viết & đăng' : 'Người đăng tự đăng'}
+          >
+            {isIC ? 'IC' : 'TỰ'}
+          </span>
+        )}
+        {!editing && p.post_type && (
+          <span className="text-[9.5px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-px truncate max-w-[66px]">
             {p.post_type}
           </span>
         )}
-        {mine && (
+        {canEdit && !editing && (
           <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={onTogglePosted}
@@ -351,7 +431,7 @@ function SlotCard({ post: p, mine, onDelete, onTogglePosted }) {
             </button>
           </span>
         )}
-        {mine && !posted && (
+        {mine && !posted && !editing && (
           <span className="absolute top-1.5 right-1.5 w-1 h-1 rounded-full bg-emerald-500 group-hover:hidden" />
         )}
       </div>
@@ -387,6 +467,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
   const [postType, setPostType] = useState('Preview');
   const [title, setTitle] = useState('');
   const [channels, setChannels] = useState(['SeaTalk']);
+  const [owner, setOwner] = useState('self');
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
   useEscape(onClose);
@@ -432,6 +513,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
         dates,
         times,
         repeat_weeks: weeks,
+        post_owner: owner,
       });
       onSaved();
     } catch (e) {
@@ -452,6 +534,57 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex flex-col gap-3.5">
+          {/* Who publishes it — decides whether this is a request to IC or just a heads-up */}
+          <div className="flex flex-col gap-1.5">
+            <Label>Ai đăng bài này?</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setOwner('self')}
+                aria-pressed={owner === 'self'}
+                className={`rounded-lg border px-3 py-2 text-left cursor-pointer transition-colors ${
+                  owner === 'self' ? 'border-[#14161F] bg-[#14161F] text-white' : 'border-slate-200 bg-[#F6F7FB] hover:border-slate-400'
+                }`}
+              >
+                <div className="text-[13px] font-bold">🙋 Tôi tự đăng</div>
+                <div className={`text-[10.5px] mt-0.5 ${owner === 'self' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  Chỉ báo chỗ để tránh trùng giờ
+                </div>
+              </button>
+              <button
+                onClick={() => setOwner('ic')}
+                aria-pressed={owner === 'ic'}
+                className={`rounded-lg border px-3 py-2 text-left cursor-pointer transition-colors ${
+                  owner === 'ic' ? 'border-[#E94560] bg-[#E94560] text-white' : 'border-slate-200 bg-[#F6F7FB] hover:border-slate-400'
+                }`}
+              >
+                <div className="text-[13px] font-bold">✍️ Nhờ IC đăng</div>
+                <div className={`text-[10.5px] mt-0.5 ${owner === 'ic' ? 'text-red-100' : 'text-slate-400'}`}>
+                  IC team viết & đăng giúp
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {owner === 'ic' && (
+            <div className="rounded-lg border border-[#E94560] bg-red-50 px-3.5 py-3">
+              <div className="text-[12.5px] font-bold text-[#14161F] mb-1">
+                📝 Điền thông tin bài muốn đăng
+              </div>
+              <div className="text-[11.5px] text-slate-600 leading-relaxed mb-2">
+                IC cần nội dung chi tiết để viết bài. Điền form dưới đây — slot vẫn được giữ chỗ ngay
+                sau khi bạn bấm Lưu.
+              </div>
+              <a
+                href={IC_BRIEF_FORM}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#E94560] text-white text-[12.5px] font-bold px-3.5 py-2 hover:bg-[#d13a52]"
+              >
+                Mở form điền nội dung ↗
+              </a>
+            </div>
+          )}
+
           {/* Days */}
           <div className="flex flex-col gap-1.5">
             <Label>Ngày đăng — chọn nhiều ngày nếu bài lặp</Label>
@@ -684,11 +817,11 @@ function HistoryTable({ rows }) {
       </div>
       <div className="overflow-x-auto">
         <div className="min-w-[860px]">
-          <div className="grid grid-cols-[92px_1fr_150px_110px_130px_120px] px-5 py-2.5 bg-[#F6F7FB] text-[10px] font-bold tracking-wider text-slate-400 gap-3">
-            <span>NGÀY ĐĂNG</span><span>BÀI ĐĂNG</span><span>CAMPAIGN</span><span>NGƯỜI ĐĂNG</span><span>KÊNH</span><span>CHỈ SỐ</span>
+          <div className="grid grid-cols-[92px_1fr_150px_110px_56px_120px_110px] px-5 py-2.5 bg-[#F6F7FB] text-[10px] font-bold tracking-wider text-slate-400 gap-3">
+            <span>NGÀY ĐĂNG</span><span>BÀI ĐĂNG</span><span>CAMPAIGN</span><span>NGƯỜI ĐĂNG</span><span>AI ĐĂNG</span><span>KÊNH</span><span>CHỈ SỐ</span>
           </div>
           {filtered.map(p => (
-            <div key={p.id} className="grid grid-cols-[92px_1fr_150px_110px_130px_120px] px-5 py-3 border-t border-slate-50 items-center gap-3 text-[12px]">
+            <div key={p.id} className="grid grid-cols-[92px_1fr_150px_110px_56px_120px_110px] px-5 py-3 border-t border-slate-50 items-center gap-3 text-[12px]">
               <span className="text-slate-400 tabular-nums">{formatDateShort(p.posted_at || p.scheduled_at)}</span>
               <div>
                 <div className="font-medium text-[#14161F]">{p.title}</div>
@@ -699,6 +832,13 @@ function HistoryTable({ rows }) {
                 <span className="truncate">{p.campaign_name}</span>
               </span>
               <span className="text-slate-600 truncate">{p.submitted_by || p.operator_email || '—'}</span>
+              <span>
+                <span className={`text-[9px] font-extrabold uppercase rounded px-1.5 py-px ${
+                  p.post_owner === 'ic' ? 'bg-[#E94560] text-white' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {p.post_owner === 'ic' ? 'IC' : 'TỰ'}
+                </span>
+              </span>
               <span className="text-slate-500 truncate">{(p.channels || []).join(', ') || '—'}</span>
               <span className="text-slate-500 tabular-nums text-[11px]">
                 {p.st_seen || 0} seen · {p.st_react || 0} react
