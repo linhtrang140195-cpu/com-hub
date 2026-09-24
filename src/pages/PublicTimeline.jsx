@@ -409,6 +409,9 @@ export default function PublicTimeline() {
               <span className="inline-flex items-center gap-1.5">
                 <span className="text-[9px] font-extrabold bg-slate-100 text-slate-500 rounded px-1.5 py-px">TỰ</span> Người đăng tự đăng
               </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[9px] font-extrabold bg-indigo-50 text-indigo-600 rounded px-1.5 py-px">KẾ HOẠCH</span> Từ plan trong Comms Hub
+              </span>
               <span className="w-px h-3.5 bg-slate-200" />
               <span>
                 {isAdmin
@@ -481,7 +484,9 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
         {editing && (
           <button onClick={onTimeSave} className="text-[11px] font-bold text-emerald-600 leading-none px-1 cursor-pointer">✓</button>
         )}
-        {!editing && (
+        {/* Only slots booked through this board carry an owner. Posts planned in
+            Comms Hub have none, and labelling those "tự đăng" would be wrong. */}
+        {!editing && p.post_owner && (
           <span
             className={`text-[9px] font-extrabold uppercase tracking-wide rounded px-1.5 py-px shrink-0 ${
               isIC ? 'bg-[#E94560] text-white' : 'bg-slate-100 text-slate-500'
@@ -489,6 +494,14 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
             title={isIC ? 'IC team viết & đăng' : 'Người đăng tự đăng'}
           >
             {isIC ? 'IC' : 'TỰ'}
+          </span>
+        )}
+        {!editing && !p.post_owner && (
+          <span
+            className="text-[9px] font-extrabold uppercase tracking-wide rounded px-1.5 py-px shrink-0 bg-indigo-50 text-indigo-600"
+            title="Bài từ kế hoạch truyền thông trong Comms Hub"
+          >
+            Kế hoạch
           </span>
         )}
         {!editing && conflict && (
