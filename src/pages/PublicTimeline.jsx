@@ -26,8 +26,23 @@ function ensureKey() {
     return 'p' + Math.random().toString(36).slice(2, 12);
   }
 }
-function readName() {
-  try { return localStorage.getItem('commshub_public_name') || ''; } catch { return ''; }
+// Prefill from the Comms Hub session when there is one, so a logged-in
+// colleague never retypes their address.
+function readEmail() {
+  try {
+    const saved = localStorage.getItem('commshub_public_email');
+    if (saved) return saved;
+    return JSON.parse(localStorage.getItem('commshub_user') || 'null')?.email || '';
+  } catch { return ''; }
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+// Display label for a slot: "linhtrang.tran" reads better than the full address
+// in a narrow card, and matches how the SeaTalk digest already names people.
+function personOf(p) {
+  if (p.operator_email) return p.operator_email.split('@')[0];
+  return p.submitted_by || '—';
 }
 
 function vnDayLabel(key) {
@@ -46,7 +61,7 @@ function useEscape(onEscape) {
 
 export default function PublicTimeline() {
   const publicKey = useMemo(ensureKey, []);
-  const [me, setMe] = useState(readName);
+  const [me, setMe] = useState(readEmail);
   const [weekOffset, setWeekOffset] = useState(0);
   const [posts, setPosts] = useState([]);
   const [history, setHistory] = useState([]);
@@ -77,11 +92,12 @@ export default function PublicTimeline() {
     if (tab === 'history') api.get('/public/history').then(setHistory).catch(() => {});
   }, [tab]);
 
-  const saveName = (v) => {
-    const n = v.trim().slice(0, 120);
+  const saveEmail = (v) => {
+    const n = v.trim().toLowerCase().slice(0, 255);
     setMe(n);
-    try { localStorage.setItem('commshub_public_name', n); } catch { /* private mode */ }
+    try { localStorage.setItem('commshub_public_email', n); } catch { /* private mode */ }
   };
+  const emailOk = EMAIL_RE.test(me);
 
   const postsForDay = (day) =>
     posts.filter(p => isSameDayVN(p.scheduled_at, day))
@@ -144,7 +160,7 @@ export default function PublicTimeline() {
       any = true;
       if (keys.length > 1) lines.push(`── ${vnDayLabel(k)} ──`);
       rows.forEach(p => {
-        const who = p.submitted_by || p.operator_email || '—';
+        const who = personOf(p);
         const tag = p.post_owner === 'ic' ? '  [IC đăng]' : '';
         lines.push(`${formatTimeVN(p.scheduled_at)}  ·  ${who}  ·  ${p.campaign_name}${tag}`);
         lines.push(`   ${p.title}`);
@@ -174,7 +190,10 @@ export default function PublicTimeline() {
               Lịch đăng bài chung
             </div>
             <div className="text-[12.5px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-              <span>Ai cũng điền được — không cần đăng nhập. Bot tổng hợp gửi group mỗi sáng.</span>
+              <span>
+                Đặt chỗ đăng bài trên các kênh nội bộ Garena — xem ai đang đăng gì, khi nào,
+                để tránh chồng chéo nội dung. Ai cũng điền được, không cần đăng nhập.
+              </span>
               {isAdmin && (
                 <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wide bg-[#14161F] text-white rounded px-2 py-0.5">
                   🔑 Admin
@@ -182,24 +201,37 @@ export default function PublicTimeline() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2.5 bg-[#F6F7FB] border border-slate-200 rounded-xl px-3 py-2">
-            <div
-              className="w-8 h-8 rounded-lg grid place-items-center text-white text-[12px] font-extrabold shrink-0"
-              style={{ background: me ? '#E94560' : '#94A3B8' }}
-            >
-              {me ? me.trim().split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?'}
+          <div className="flex flex-col items-end gap-1">
+            <div className={`flex items-center gap-2.5 bg-[#F6F7FB] border rounded-xl px-3 py-2 ${
+              me && !emailOk ? 'border-[#E94560]' : 'border-slate-200'
+            }`}>
+              <div
+                className="w-8 h-8 rounded-lg grid place-items-center text-white text-[12px] font-extrabold shrink-0"
+                style={{ background: emailOk ? '#E94560' : '#94A3B8' }}
+              >
+                {emailOk ? me.slice(0, 2).toUpperCase() : '?'}
+              </div>
+              <div>
+                <div className="text-[10px] font-bold tracking-wider uppercase text-slate-400">Email của bạn</div>
+                <input
+                  type="email"
+                  value={me}
+                  onChange={e => setMe(e.target.value)}
+                  onBlur={e => saveEmail(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                  placeholder="ten.ho@garena.vn"
+                  className="bg-transparent border-none outline-none text-[13px] font-semibold w-[178px] p-0"
+                />
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] font-bold tracking-wider uppercase text-slate-400">Bạn là</div>
-              <input
-                value={me}
-                onChange={e => setMe(e.target.value)}
-                onBlur={e => saveName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                placeholder="Điền tên bạn"
-                className="bg-transparent border-none outline-none text-[13.5px] font-semibold w-[130px] p-0"
-              />
-            </div>
+            {me && !emailOk && (
+              <span className="text-[10.5px] font-semibold text-[#E94560]">Email chưa đúng định dạng</span>
+            )}
+            {!isAdmin && (
+              <a href="/login" className="text-[10.5px] text-slate-400 hover:text-[#E94560] hover:underline">
+                Là admin? Đăng nhập để sắp xếp lịch cả team ↗
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -453,7 +485,7 @@ function SlotCard({ post: p, mine, isAdmin, editingTime, setEditingTime, onTimeS
           <span key={ch} className="text-[9.5px] font-semibold text-slate-500 bg-slate-100 rounded px-1.5 py-px">{ch}</span>
         ))}
         <span className="ml-auto text-[10px] font-bold text-slate-500 truncate max-w-[92px]">
-          {p.submitted_by || p.operator_email || '—'}
+          {personOf(p)}
         </span>
       </div>
     </div>
@@ -497,7 +529,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
     set(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
 
   const save = async () => {
-    if (!me.trim())    return setErr('Điền tên bạn ở góc trên bên phải trước đã.');
+    if (!EMAIL_RE.test(me.trim())) return setErr('Điền email công ty của bạn ở góc trên bên phải trước đã.');
     if (!title.trim()) return setErr('Điền tiêu đề bài.');
     if (!campaign.trim()) return setErr('Chọn hoặc điền tên campaign.');
     if (!dates.length) return setErr('Chọn ít nhất một ngày.');
@@ -507,7 +539,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
     try {
       await api.post('/public/posts', {
         public_key: publicKey,
-        submitted_by: me.trim(),
+        email: me.trim().toLowerCase(),
         campaign: campaign.trim(),
         post_type: postType.trim() || 'POST',
         title: title.trim(),
@@ -530,7 +562,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100">
           <div>
             <div className="text-[16px] font-extrabold">Hôm nay bạn muốn truyền thông gì?</div>
-            <div className="text-[11.5px] text-slate-400 mt-0.5">{me || 'Chưa điền tên'} · {vnDayLabel(dateKey)}</div>
+            <div className="text-[11.5px] text-slate-400 mt-0.5">{me || 'Chưa điền email'} · {vnDayLabel(dateKey)}</div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer">✕</button>
         </div>
@@ -858,7 +890,7 @@ function HistoryTable({ rows }) {
     return rows.filter(r => {
       if (camp && r.campaign_name !== camp) return false;
       if (!needle) return true;
-      const who = (r.submitted_by || r.operator_email || '').toLowerCase();
+      const who = `${r.operator_email || ''} ${r.submitted_by || ''}`.toLowerCase();
       return who.includes(needle) || (r.title || '').toLowerCase().includes(needle);
     });
   }, [rows, q, camp]);
@@ -920,7 +952,7 @@ function HistoryTable({ rows }) {
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: p.campaign_color || '#CBD5E1' }} />
                 <span className="truncate">{p.campaign_name}</span>
               </span>
-              <span className="text-slate-600 truncate">{p.submitted_by || p.operator_email || '—'}</span>
+              <span className="text-slate-600 truncate" title={p.operator_email || ""}>{personOf(p)}</span>
               <span>
                 <span className={`text-[9px] font-extrabold uppercase rounded px-1.5 py-px ${
                   p.post_owner === 'ic' ? 'bg-[#E94560] text-white' : 'bg-slate-100 text-slate-500'

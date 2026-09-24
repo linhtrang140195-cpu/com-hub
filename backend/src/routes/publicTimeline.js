@@ -132,8 +132,13 @@ router.post('/posts', async (req, res) => {
 
   if (!validKey(b.public_key)) return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
 
-  const submitted_by = clean(b.submitted_by, 120);
-  if (!submitted_by) return res.status(400).json({ error: 'Điền tên của bạn' });
+  // Identity is the work email: it is stable across submissions and is the
+  // same column the rest of Comms Hub keys people off, so these slots join up
+  // with reports and the operator views instead of being a separate island.
+  const email = clean(b.email, 255).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return res.status(400).json({ error: 'Điền email công ty hợp lệ (vd: ten.ho@garena.vn)' });
+  }
 
   const title = clean(b.title, 500);
   if (!title) return res.status(400).json({ error: 'Điền tiêu đề bài' });
@@ -168,10 +173,10 @@ router.post('/posts', async (req, res) => {
         const id = newId();
         await query(
           `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, channels,
-                              status, public_key, submitted_by, series_id, post_owner)
+                              status, public_key, operator_email, series_id, post_owner)
            VALUES (?,?,?,?,?,?,'scheduled',?,?,?,?)`,
           [id, campaign_id, when, post_type, title, JSON.stringify(channels),
-           b.public_key, submitted_by, series_id, post_owner]
+           b.public_key, email, series_id, post_owner]
         );
         created.push(id);
       }
