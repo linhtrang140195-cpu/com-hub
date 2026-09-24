@@ -131,12 +131,10 @@ router.get('/meta', async (_req, res) => {
   const { rows } = await query(
     `SELECT name, color FROM campaigns WHERE status != 'archived' ORDER BY name`
   );
-  const { rows: typeRows } = await query(
-    `SELECT DISTINCT post_type FROM posts WHERE post_type IS NOT NULL AND post_type != '' ORDER BY post_type`
-  );
+  // Post types are a curated list in the UI, not harvested from existing rows —
+  // the imported plans carry too many one-off values to pick from.
   res.json({
     campaigns: rows,
-    post_types: typeRows.map(r => r.post_type),
     channels: ['SeaTalk', 'Email', 'Web', 'Sailor', 'Facebook', 'TikTok'],
   });
 });

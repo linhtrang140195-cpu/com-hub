@@ -10,7 +10,11 @@ import ConflictAlert from '../components/shared/ConflictAlert';
 const DOW = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 // Brief form the requester fills in when they ask the IC team to write the post.
 const IC_BRIEF_FORM = 'https://forms.gle/fSP29o5daJKDje2G6';
-const FALLBACK_TYPES = ['Preview', 'Result + BXH', 'Highlight', 'Recap ngày', 'Announce', 'Event', 'Story', 'Video', 'LIVE', 'BRIEF Design'];
+// Deliberately short, curated lists. Deriving these from existing posts dragged
+// in years of one-off values from the Excel imports ("SeaTalk/ Web/ Sailor",
+// "XKÊ", "→ Design / AI") and buried the few that people actually pick.
+const POST_TYPES = ['Announce', 'Event', 'Engagement', 'Reminder'];
+const CAMPAIGN_GROUPS = ['Event', 'L&D', 'HR', 'Văn hoá', 'Giải đấu', 'IC'];
 const FALLBACK_CHANNELS = ['SeaTalk', 'Email', 'Web', 'Sailor', 'Facebook', 'TikTok'];
 
 // The browser token that makes a slot "yours" — the only thing letting an
@@ -597,7 +601,6 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
   }, [dateKey]);
 
   const total = dates.length * times.length * weeks;
-  const typeOptions = [...new Set([...FALLBACK_TYPES, ...(meta.post_types || [])])];
   const chanOptions = meta.channels?.length ? meta.channels : FALLBACK_CHANNELS;
 
   // Functional update — two chips clicked in quick succession must not read
@@ -752,7 +755,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
 
           <PickOrType
             label="Campaign"
-            options={(meta.campaigns || []).map(c => c.name)}
+            options={CAMPAIGN_GROUPS}
             value={campaign}
             onChange={setCampaign}
             placeholder="Tên campaign mới"
@@ -760,7 +763,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
 
           <PickOrType
             label="Loại bài"
-            options={typeOptions}
+            options={POST_TYPES}
             value={postType}
             onChange={setPostType}
             placeholder="Loại bài khác"
