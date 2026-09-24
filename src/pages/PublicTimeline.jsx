@@ -115,7 +115,8 @@ export default function PublicTimeline() {
       return;
     }
     try {
-      await api.delete(`/public/posts/${p.id}?key=${encodeURIComponent(publicKey)}${series ? '&series=1' : ''}`);
+      const q = `key=${encodeURIComponent(publicKey)}&email=${encodeURIComponent(me)}`;
+      await api.delete(`/public/posts/${p.id}?${q}${series ? '&series=1' : ''}`);
       load();
     } catch (e) { alert(e.message); }
   };
@@ -128,7 +129,7 @@ export default function PublicTimeline() {
     const when = `${toDateInputValue(p.scheduled_at)}T${hh}:${mm}:00+07:00`;
     setEditingTime(null);
     try {
-      await api.patch(`/public/posts/${p.id}`, { public_key: publicKey, scheduled_at: when });
+      await api.patch(`/public/posts/${p.id}`, { public_key: publicKey, email: me, scheduled_at: when });
       load();
     } catch (e) { alert(e.message); }
   };
@@ -137,6 +138,7 @@ export default function PublicTimeline() {
     try {
       await api.patch(`/public/posts/${p.id}`, {
         public_key: publicKey,
+        email: me,
         status: p.status === 'posted' ? 'scheduled' : 'posted',
       });
       load();
@@ -328,7 +330,9 @@ export default function PublicTimeline() {
                                 <SlotCard
                                   key={p.id}
                                   post={p}
-                                  mine={p.public_key === publicKey}
+                                  mine={p.public_key === publicKey ||
+                                        Boolean(emailOk && p.operator_email &&
+                                                p.operator_email.toLowerCase() === me.toLowerCase())}
                                   isAdmin={isAdmin}
                                   editingTime={editingTime}
                                   setEditingTime={setEditingTime}
@@ -370,7 +374,7 @@ export default function PublicTimeline() {
               <span>
                 {isAdmin
                   ? <>Bạn là <b className="text-slate-700">admin</b> — bấm vào giờ của bất kỳ bài nào để sắp xếp lại, hoặc xoá bài của mọi người.</>
-                  : <>Chỉ sửa/xoá được bài mình tạo. Bấm ✓ khi đã đăng — bài sẽ chuyển sang tab <b className="text-slate-700">Đã đăng</b> và được lưu lại.</>}
+                  : <>Sửa/xoá được bài đặt bằng <b className="text-slate-700">email của bạn</b>, kể cả khi mở từ máy khác. Bấm ✓ khi đã đăng — bài chuyển sang tab <b className="text-slate-700">Đã đăng</b> và được lưu lại.</>}
               </span>
             </div>
           </>

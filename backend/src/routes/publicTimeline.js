@@ -25,6 +25,19 @@ function isAdmin(req) {
   return req.user?.role === 'admin';
 }
 
+// A slot is yours if this browser created it, or if you say you are the address
+// it was booked under. The email arm is what makes a slot editable from a second
+// device or after clearing site data — without it the browser token is the only
+// proof and people get locked out of their own bookings. It is claim-based, not
+// verified: on an internal coordination board the cost of that is low, every row
+// shows who owns it, and an admin can undo anything.
+function ownsRow(req, row, key, email) {
+  if (isAdmin(req)) return true;
+  if (row.public_key && key && row.public_key === key) return true;
+  const claimed = String(email || '').trim().toLowerCase();
+  return Boolean(claimed && row.operator_email && row.operator_email.toLowerCase() === claimed);
+}
+
 function normaliseOwner(v) {
   return v === 'ic' ? 'ic' : 'self';
 }
@@ -189,15 +202,14 @@ router.post('/posts', async (req, res) => {
 // PATCH /api/public/posts/:id — submitter edits their own slot
 router.patch('/posts/:id', async (req, res) => {
   const b = req.body || {};
-  const admin = isAdmin(req);
-  if (!admin && !validKey(b.public_key)) {
-    return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
-  }
 
-  const { rows } = await query('SELECT public_key, status FROM posts WHERE id = ?', [req.params.id]);
+  const { rows } = await query(
+    'SELECT public_key, operator_email, status FROM posts WHERE id = ?',
+    [req.params.id]
+  );
   if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy bài' });
-  if (!admin && rows[0].public_key !== b.public_key) {
-    return res.status(403).json({ error: 'Chỉ người tạo slot mới sửa được' });
+  if (!ownsRow(req, rows[0], b.public_key, b.email)) {
+    return res.status(403).json({ error: 'Chỉ người đặt slot (hoặc admin) mới sửa được' });
   }
 
   const sets = [];
@@ -226,28 +238,30 @@ router.patch('/posts/:id', async (req, res) => {
 // DELETE /api/public/posts/:id?key=...&series=1
 router.delete('/posts/:id', async (req, res) => {
   const key = req.query.key;
-  const admin = isAdmin(req);
-  if (!admin && !validKey(key)) {
-    return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
-  }
+  const email = String(req.query.email || '').trim().toLowerCase();
 
-  const { rows } = await query('SELECT public_key, series_id FROM posts WHERE id = ?', [req.params.id]);
+  const { rows } = await query(
+    'SELECT public_key, operator_email, series_id FROM posts WHERE id = ?',
+    [req.params.id]
+  );
   if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy bài' });
-  if (!admin && rows[0].public_key !== key) {
-    return res.status(403).json({ error: 'Chỉ người tạo slot mới xoá được' });
+  if (!ownsRow(req, rows[0], key, email)) {
+    return res.status(403).json({ error: 'Chỉ người đặt slot (hoặc admin) mới xoá được' });
   }
 
+  // Deleting a whole series removes only the rows this caller also owns, so one
+  // person clearing their repeat cannot take out someone else's slots that
+  // happen to share the id.
   if (req.query.series === '1' && rows[0].series_id) {
-    const { rowCount } = admin
+    const { rowCount } = isAdmin(req)
       ? await query('DELETE FROM posts WHERE series_id = ?', [rows[0].series_id])
-      : await query('DELETE FROM posts WHERE series_id = ? AND public_key = ?', [rows[0].series_id, key]);
+      : await query(
+          'DELETE FROM posts WHERE series_id = ? AND (public_key = ? OR LOWER(operator_email) = ?)',
+          [rows[0].series_id, key || null, email || null]
+        );
     return res.json({ deleted: rowCount });
   }
-  if (admin) {
-    await query('DELETE FROM posts WHERE id = ?', [req.params.id]);
-  } else {
-    await query('DELETE FROM posts WHERE id = ? AND public_key = ?', [req.params.id, key]);
-  }
+  await query('DELETE FROM posts WHERE id = ?', [req.params.id]);
   res.json({ deleted: 1 });
 });
 
