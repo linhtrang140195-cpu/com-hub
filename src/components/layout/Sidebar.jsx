@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 const ADMIN_NAV = [
   { to: '/admin/timeline', icon: '📅', label: 'Master Timeline' },
   { to: '/admin/calendar', icon: '🗓️', label: 'Master Calendar' },
+  // Same board the whole company books on, reached from inside the app.
+  { to: '/timeline', icon: '🔓', label: 'Lịch đăng bài chung' },
   { to: '/admin/campaigns', icon: '🗂️', label: 'Tất cả campaigns' },
   { to: '/admin/reports', icon: '📊', label: 'Báo cáo' },
   { to: '/admin/archive', icon: '📦', label: 'Archive' },
@@ -14,6 +16,7 @@ const OPERATOR_NAV = [
   { to: '/operator/today', icon: '✅', label: 'Hôm nay' },
   { to: '/operator/write', icon: '✍️', label: 'Viết bài' },
   { to: '/operator/history', icon: '📋', label: 'Lịch sử đăng' },
+  { to: '/timeline', icon: '🔓', label: 'Lịch đăng bài chung' },
 ];
 
 function NavItem({ to, icon, label }) {
@@ -69,7 +72,9 @@ export default function Sidebar({ campaigns = [], activeCampaignId }) {
           ))}
 
           <div className="px-4 pt-5 pb-2 text-[10px] text-slate-400 font-bold tracking-widest">THAO TÁC CỦA TÔI</div>
-          {OPERATOR_NAV.filter(item => item.to !== '/operator/timeline').map(item => <NavItem key={item.to} {...item} />)}
+          {OPERATOR_NAV
+            .filter(item => item.to !== '/operator/timeline' && item.to !== '/timeline')
+            .map(item => <NavItem key={item.to} {...item} />)}
         </>
       ) : (
         <>

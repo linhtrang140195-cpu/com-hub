@@ -212,8 +212,14 @@ export default function PublicTimeline() {
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-[1400px] mx-auto px-5 py-4 flex items-start justify-between gap-5 flex-wrap">
           <div>
-            <div className="text-[10.5px] font-bold tracking-[0.13em] uppercase text-[#E94560] mb-0.5">
-              Comms Hub · IC Team Garena VN
+            <div className="text-[10.5px] font-bold tracking-[0.13em] uppercase text-[#E94560] mb-0.5 flex items-center gap-2">
+              <span>Comms Hub · IC Team Garena VN</span>
+              {/* This page has no sidebar, so signed-in staff need a way back. */}
+              {isAdmin && (
+                <a href="/admin/timeline" className="normal-case tracking-normal font-semibold text-slate-400 hover:text-[#E94560] hover:underline">
+                  ← Về Comms Hub
+                </a>
+              )}
             </div>
             <div className="text-[23px] font-extrabold text-[#14161F] leading-tight">
               Lịch đăng bài chung
