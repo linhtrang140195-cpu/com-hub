@@ -92,6 +92,33 @@ async function runMigrations() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       updated_by VARCHAR(255)
     )` },
+
+    // Metrics nested by channel: {"seatalk":{"seen":450,…},"email":{"recipients":620,…}}.
+    // The five legacy INT columns stay forever — version snapshots, the public
+    // board and several components read them directly — and are written in
+    // step with this. Nesting by channel is what lets one post carry numbers
+    // for three channels without guessing how to split them.
+    { name: 'posts.metrics', sql: 'ALTER TABLE posts ADD COLUMN metrics JSON NULL AFTER sailor_views' },
+    { name: 'posts.metrics_backfill', sql: `UPDATE posts SET metrics = JSON_OBJECT(
+        'seatalk', JSON_OBJECT('seen', COALESCE(st_seen,0), 'react', COALESCE(st_react,0), 'reply', COALESCE(st_reply,0)),
+        'web',     JSON_OBJECT('views', COALESCE(web_views,0)),
+        'sailor',  JSON_OBJECT('views', COALESCE(sailor_views,0))
+      ) WHERE metrics IS NULL` },
+
+    // Denominators. Reach is a ratio and nothing stored an audience size, so
+    // no rate could be computed at all. effective_from stops last quarter's
+    // numbers being recalculated against this quarter's headcount.
+    { name: 'channel_audience', sql: `CREATE TABLE IF NOT EXISTS channel_audience (
+      id             CHAR(36) PRIMARY KEY,
+      channel        VARCHAR(32) NOT NULL,
+      campaign_id    CHAR(36) NULL,
+      audience_size  INT NOT NULL,
+      effective_from DATE NOT NULL,
+      note           VARCHAR(255),
+      updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      updated_by     VARCHAR(255),
+      INDEX idx_ca_lookup (channel, campaign_id, effective_from)
+    )` },
   ];
   const conn = await pool.getConnection();
   try {

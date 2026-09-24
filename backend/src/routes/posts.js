@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, newId } from '../db.js';
 import { detectConflicts } from '../services/conflictDetect.js';
 import { requireAuth, requireAdmin, requireCampaignAccess, campaignIdFromPost } from '../middleware/auth.js';
+import { resolveMetrics, mergeMetrics, legacyColumnsFor } from '../services/metrics.js';
 
 const router = Router();
 
@@ -77,9 +78,11 @@ router.post('/', requireAdmin, async (req, res) => {
 });
 
 router.patch('/:id', requireAuth, requireCampaignAccess(campaignIdFromPost), async (req, res) => {
+  // The five metric columns are deliberately absent here — the metrics block
+  // below owns them, so they cannot be assigned twice in one UPDATE.
   const plainFields = ['post_type', 'title', 'description', 'caption_hint', 'seatalk_caption',
     'web_caption', 'visual_template', 'operator_email', 'status', 'approval_status',
-    'st_seen', 'st_react', 'st_reply', 'web_views', 'sailor_views', 'live_link', 'image_url', 'brief_design', 'notes', 'phase_id'];
+    'live_link', 'image_url', 'brief_design', 'notes', 'phase_id'];
   const sets = [];
   const values = [];
   for (const f of plainFields) {
@@ -88,6 +91,32 @@ router.patch('/:id', requireAuth, requireCampaignAccess(campaignIdFromPost), asy
   if ('scheduled_at' in req.body) { sets.push('scheduled_at = ?'); values.push(new Date(req.body.scheduled_at)); }
   if ('channels' in req.body) { sets.push('channels = ?'); values.push(JSON.stringify(req.body.channels)); }
   if ('posted_at' in req.body) { sets.push('posted_at = ?'); values.push(req.body.posted_at ? new Date(req.body.posted_at) : null); }
+
+  // Metrics arrive either as the per-channel object or as the five legacy
+  // fields above. Either way both representations are written, so nothing
+  // that still reads the columns goes stale.
+  const legacyMetricSent = ['st_seen', 'st_react', 'st_reply', 'web_views', 'sailor_views']
+    .some(f => f in req.body);
+  if ('metrics' in req.body || legacyMetricSent) {
+    const { rows: cur } = await query('SELECT * FROM posts WHERE id = ?', [req.params.id]);
+    if (!cur.length) return res.status(404).json({ error: 'Not found' });
+
+    // Start from what is stored, layer the legacy fields, then the object —
+    // most specific last.
+    let merged = mergeMetrics(resolveMetrics(cur[0]), {});
+    if (legacyMetricSent) {
+      merged = mergeMetrics(merged, resolveMetrics({ ...cur[0], ...req.body, metrics: null }));
+    }
+    if ('metrics' in req.body) merged = mergeMetrics(merged, req.body.metrics);
+
+    sets.push('metrics = ?');
+    values.push(JSON.stringify(merged));
+    for (const [col, val] of Object.entries(legacyColumnsFor(merged))) {
+      sets.push(`${col} = ?`);
+      values.push(val);
+    }
+  }
+
   if (!sets.length) return res.status(400).json({ error: 'No fields' });
   if (req.body.status === 'posted' && !('posted_at' in req.body)) {
     sets.push('posted_at = NOW()');
