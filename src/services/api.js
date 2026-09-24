@@ -2,19 +2,21 @@
 // override with VITE_API_BASE_URL for local dev against a separate backend port.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-function getStoredEmail() {
+// The session token issued at login. Identity is proved by its signature —
+// an email header would just be a claim anyone could make.
+function getToken() {
   try {
-    return JSON.parse(localStorage.getItem('commshub_user') || 'null')?.email || null;
+    return localStorage.getItem('commshub_token') || null;
   } catch {
     return null;
   }
 }
 
 async function request(path, { method = 'GET', body, headers = {}, isFormData = false } = {}) {
-  const email = getStoredEmail();
+  const token = getToken();
   const finalHeaders = { ...headers };
   if (!isFormData) finalHeaders['Content-Type'] = 'application/json';
-  if (email) finalHeaders['X-User-Email'] = email;
+  if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
@@ -32,9 +34,9 @@ async function request(path, { method = 'GET', body, headers = {}, isFormData = 
 }
 
 async function getBlob(path) {
-  const email = getStoredEmail();
+  const token = getToken();
   const headers = {};
-  if (email) headers['X-User-Email'] = email;
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE_URL}${path}`, { headers });
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.blob();

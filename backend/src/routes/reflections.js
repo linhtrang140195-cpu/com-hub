@@ -21,7 +21,7 @@ router.get('/:year_month', async (req, res) => {
 
 router.patch('/:year_month', async (req, res) => {
   const { what_worked, what_failed, why_text, next_action } = req.body;
-  const updatedBy = req.headers['x-user-email'] || null;
+  const updatedBy = req.user?.email || null;
   await query(
     `INSERT INTO monthly_reflections (\`year_month\`, what_worked, what_failed, why_text, next_action, updated_by)
      VALUES (?,?,?,?,?,?)

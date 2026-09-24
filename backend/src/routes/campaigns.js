@@ -4,26 +4,19 @@ import { requireAuth, requireAdmin, requireCampaignAccess } from '../middleware/
 
 const router = Router();
 
-// List campaigns — filter by operator email if X-User-Email is not admin
+// List campaigns — an operator sees only what they are assigned to. Identity
+// comes from the signed token via req.user, not from a caller-set header.
 router.get('/', requireAuth, async (req, res) => {
-  const email = req.headers['x-user-email'];
   let campaigns;
-  if (email) {
-    const { rows: userRows } = await query('SELECT role FROM users WHERE LOWER(email) = LOWER(?)', [email]);
-    const role = userRows[0]?.role;
-    if (role === 'operator') {
-      const { rows } = await query(
-        `SELECT c.* FROM campaigns c
-         JOIN campaign_assignments a ON a.campaign_id = c.id
-         WHERE LOWER(a.user_email) = LOWER(?)
-         ORDER BY c.start_date DESC`,
-        [email]
-      );
-      campaigns = rows;
-    } else {
-      const { rows } = await query('SELECT * FROM campaigns ORDER BY start_date DESC');
-      campaigns = rows;
-    }
+  if (req.user.role === 'operator') {
+    const { rows } = await query(
+      `SELECT c.* FROM campaigns c
+       JOIN campaign_assignments a ON a.campaign_id = c.id
+       WHERE LOWER(a.user_email) = LOWER(?)
+       ORDER BY c.start_date DESC`,
+      [req.user.email]
+    );
+    campaigns = rows;
   } else {
     const { rows } = await query('SELECT * FROM campaigns ORDER BY start_date DESC');
     campaigns = rows;

@@ -1,15 +1,25 @@
 import { query } from '../db.js';
+import { verifyToken } from '../services/auth.js';
 
-// Resolves req.user = {email, role} from the X-User-Email header.
-// Mock auth — trusts the header value's identity, but still looks the row up
-// fresh from `users` on every request so role changes take effect immediately.
+// Identity comes from a signed bearer token issued at login — never from a
+// header the caller can simply set. The role is still read fresh from `users`
+// on every request so a change takes effect immediately rather than waiting
+// for the token to expire.
 export async function attachUser(req, _res, next) {
-  const email = req.headers['x-user-email'];
-  if (!email) { req.user = null; return next(); }
+  req.user = null;
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return next();
+
   try {
-    const { rows } = await query('SELECT email, name, role FROM users WHERE LOWER(email) = LOWER(?)', [email]);
+    const payload = await verifyToken(token);
+    if (!payload?.email) return next();
+    const { rows } = await query(
+      'SELECT email, name, role FROM users WHERE LOWER(email) = LOWER(?)',
+      [payload.email]
+    );
     req.user = rows[0] || null;
-  } catch (e) {
+  } catch {
     req.user = null;
   }
   next();

@@ -228,16 +228,18 @@ export default function PublicTimeline() {
             <div className="text-[23px] font-extrabold text-[#14161F] leading-tight">
               Lịch đăng bài chung
             </div>
-            <div className="text-[12.5px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-              <span>
-                Đặt chỗ đăng bài trên các kênh nội bộ Garena — xem ai đang đăng gì, khi nào,
-                để tránh chồng chéo nội dung. Ai cũng điền được, không cần đăng nhập.
-              </span>
-              {isAdmin && (
-                <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wide bg-[#14161F] text-white rounded px-2 py-0.5">
-                  🔑 Admin
-                </span>
-              )}
+            <div className="mt-0.5">
+              <div className="text-[12.5px] text-slate-600 flex items-center gap-2 flex-wrap">
+                <span>Đặt chỗ đăng bài hoặc request đăng bài trên các kênh nội bộ của Garena</span>
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wide bg-[#14161F] text-white rounded px-2 py-0.5">
+                    🔑 Admin
+                  </span>
+                )}
+              </div>
+              <div className="text-[12px] italic text-slate-400 mt-0.5">
+                Ai đang đăng gì, khi nào — để tránh chồng chéo nội dung
+              </div>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -1017,9 +1019,6 @@ function HistoryTable({ rows }) {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="text-[14px] font-extrabold">🗂️ Các bài đã đăng</div>
-            <div className="text-[11.5px] text-slate-400 mt-0.5">
-              Lưu lại vĩnh viễn trong Comms Hub — dùng cho báo cáo và các tính năng sau này.
-            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <input

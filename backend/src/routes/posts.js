@@ -8,7 +8,6 @@ const router = Router();
 // GET /api/posts?campaign_id=&from=&to=&operator=&status=
 router.get('/', requireAuth, async (req, res) => {
   const { campaign_id, from, to, operator, status, include_conflicts } = req.query;
-  const email = req.headers['x-user-email'];
 
   const clauses = [];
   const params = [];
@@ -22,14 +21,13 @@ router.get('/', requireAuth, async (req, res) => {
   if (operator) { clauses.push(`LOWER(p.operator_email) = LOWER(?)`); params.push(operator); }
   if (status) { clauses.push(`p.status = ?`); params.push(status); }
 
-  if (email) {
-    const { rows: userRows } = await query('SELECT role FROM users WHERE LOWER(email) = LOWER(?)', [email]);
-    if (userRows[0]?.role === 'operator' && !operator) {
-      clauses.push(`(LOWER(p.operator_email) = LOWER(?) OR p.campaign_id IN (
-        SELECT campaign_id FROM campaign_assignments WHERE LOWER(user_email) = LOWER(?)
-      ))`);
-      params.push(email, email);
-    }
+  // req.user is set from the signed token, so the role no longer needs a
+  // second lookup and cannot be asserted by the caller.
+  if (req.user?.role === 'operator' && !operator) {
+    clauses.push(`(LOWER(p.operator_email) = LOWER(?) OR p.campaign_id IN (
+      SELECT campaign_id FROM campaign_assignments WHERE LOWER(user_email) = LOWER(?)
+    ))`);
+    params.push(req.user.email, req.user.email);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';

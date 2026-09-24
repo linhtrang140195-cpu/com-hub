@@ -81,6 +81,9 @@ async function runMigrations() {
     // 'ic'   = a request for the IC team to write and publish it
     // 'self' = the submitter publishes it themselves, registered here to avoid clashes
     { name: 'posts.post_owner', sql: "ALTER TABLE posts ADD COLUMN post_owner VARCHAR(16) NULL AFTER series_id" },
+    // scrypt "salt:hash". NULL means the account has not picked a password yet
+    // and will claim one on its next sign-in.
+    { name: 'users.password_hash', sql: 'ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NULL AFTER role' },
     // Admin-editable config that used to live only in env vars (e.g. the team
     // SeaTalk webhook), so it can be changed without a redeploy.
     { name: 'app_settings', sql: `CREATE TABLE IF NOT EXISTS app_settings (
