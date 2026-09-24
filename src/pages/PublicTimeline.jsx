@@ -34,6 +34,14 @@ function vnDayLabel(key) {
   return (dow === 0 ? 'Chủ nhật' : `Thứ ${dow + 1}`) + `, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
 }
 
+function useEscape(onEscape) {
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') onEscape(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onEscape]);
+}
+
 export default function PublicTimeline() {
   const publicKey = useMemo(ensureKey, []);
   const [me, setMe] = useState(readName);
@@ -381,6 +389,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
   const [channels, setChannels] = useState(['SeaTalk']);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+  useEscape(onClose);
 
   // The week that contains the clicked day, so the day chips are the real dates.
   const weekDays = useMemo(() => {
@@ -399,8 +408,10 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
   const typeOptions = [...new Set([...FALLBACK_TYPES, ...(meta.post_types || [])])];
   const chanOptions = meta.channels?.length ? meta.channels : FALLBACK_CHANNELS;
 
-  const toggle = (arr, v, set) =>
-    set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
+  // Functional update — two chips clicked in quick succession must not read
+  // the same stale array and cancel each other out.
+  const toggle = (set, v) =>
+    set(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
 
   const save = async () => {
     if (!me.trim())    return setErr('Điền tên bạn ở góc trên bên phải trước đã.');
@@ -446,7 +457,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
             <Label>Ngày đăng — chọn nhiều ngày nếu bài lặp</Label>
             <div className="flex flex-wrap gap-1.5">
               {weekDays.map((k, i) => (
-                <Chip key={k} on={dates.includes(k)} onClick={() => toggle(dates, k, setDates)}>
+                <Chip key={k} on={dates.includes(k)} onClick={() => toggle(setDates, k)}>
                   {DOW[i]} {k.slice(8)}/{k.slice(5, 7)}
                 </Chip>
               ))}
@@ -534,7 +545,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
             <Label>Kênh đăng</Label>
             <div className="flex flex-wrap gap-1.5">
               {chanOptions.map(ch => (
-                <Chip key={ch} on={channels.includes(ch)} onClick={() => toggle(channels, ch, setChannels)}>{ch}</Chip>
+                <Chip key={ch} on={channels.includes(ch)} onClick={() => toggle(setChannels, ch)}>{ch}</Chip>
               ))}
             </div>
           </div>
@@ -579,6 +590,7 @@ function Chip({ on, onClick, children }) {
 function DigestModal({ title, sub, text, onClose }) {
   const [value, setValue] = useState(text);
   const [copied, setCopied] = useState(false);
+  useEscape(onClose);
   const doCopy = async () => {
     if (await copyText(value)) { setCopied(true); setTimeout(() => setCopied(false), 2200); }
   };
@@ -611,20 +623,71 @@ function DigestModal({ title, sub, text, onClose }) {
 
 /* ── History ─────────────────────────────────────────── */
 function HistoryTable({ rows }) {
+  const [q, setQ] = useState('');
+  const [camp, setCamp] = useState('');
+
+  const campaigns = useMemo(
+    () => [...new Set(rows.map(r => r.campaign_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')),
+    [rows]
+  );
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter(r => {
+      if (camp && r.campaign_name !== camp) return false;
+      if (!needle) return true;
+      const who = (r.submitted_by || r.operator_email || '').toLowerCase();
+      return who.includes(needle) || (r.title || '').toLowerCase().includes(needle);
+    });
+  }, [rows, q, camp]);
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-100">
-        <div className="text-[14px] font-extrabold">🗂️ Các bài đã đăng</div>
-        <div className="text-[11.5px] text-slate-400 mt-0.5">
-          Lưu lại vĩnh viễn trong Comms Hub — dùng cho báo cáo và các tính năng sau này.
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-[14px] font-extrabold">🗂️ Các bài đã đăng</div>
+            <div className="text-[11.5px] text-slate-400 mt-0.5">
+              Lưu lại vĩnh viễn trong Comms Hub — dùng cho báo cáo và các tính năng sau này.
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="🔍 Tìm theo tên người đăng hoặc tiêu đề"
+              className="w-[268px] border border-slate-200 rounded-lg px-3 py-1.5 text-[12.5px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
+            />
+            <select
+              value={camp}
+              onChange={e => setCamp(e.target.value)}
+              className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12.5px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] cursor-pointer max-w-[190px]"
+            >
+              <option value="">Tất cả campaign</option>
+              {campaigns.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {(q || camp) && (
+              <button
+                onClick={() => { setQ(''); setCamp(''); }}
+                className="text-[12px] font-bold text-[#E94560] hover:underline cursor-pointer px-1"
+              >
+                Xoá lọc
+              </button>
+            )}
+          </div>
         </div>
+        {(q || camp) && (
+          <div className="text-[11.5px] text-slate-500 mt-2">
+            Hiện <b className="text-slate-700">{filtered.length}</b> / {rows.length} bài
+          </div>
+        )}
       </div>
       <div className="overflow-x-auto">
         <div className="min-w-[860px]">
           <div className="grid grid-cols-[92px_1fr_150px_110px_130px_120px] px-5 py-2.5 bg-[#F6F7FB] text-[10px] font-bold tracking-wider text-slate-400 gap-3">
             <span>NGÀY ĐĂNG</span><span>BÀI ĐĂNG</span><span>CAMPAIGN</span><span>NGƯỜI ĐĂNG</span><span>KÊNH</span><span>CHỈ SỐ</span>
           </div>
-          {rows.map(p => (
+          {filtered.map(p => (
             <div key={p.id} className="grid grid-cols-[92px_1fr_150px_110px_130px_120px] px-5 py-3 border-t border-slate-50 items-center gap-3 text-[12px]">
               <span className="text-slate-400 tabular-nums">{formatDateShort(p.posted_at || p.scheduled_at)}</span>
               <div>
@@ -642,9 +705,11 @@ function HistoryTable({ rows }) {
               </span>
             </div>
           ))}
-          {!rows.length && (
+          {!filtered.length && (
             <div className="p-8 text-center text-sm text-slate-400">
-              Chưa có bài nào được đánh dấu đã đăng.
+              {rows.length
+                ? 'Không có bài nào khớp bộ lọc.'
+                : 'Chưa có bài nào được đánh dấu đã đăng.'}
             </div>
           )}
         </div>
