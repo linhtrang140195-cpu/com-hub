@@ -153,11 +153,11 @@ router.post('/posts', async (req, res) => {
     return res.status(400).json({ error: 'Điền email công ty hợp lệ (vd: ten.ho@garena.vn)' });
   }
 
-  const title = clean(b.title, 500);
-  if (!title) return res.status(400).json({ error: 'Điền tiêu đề bài' });
-
-  const campaign_id = await resolveCampaign(b.campaign);
-  if (!campaign_id) return res.status(400).json({ error: 'Chọn hoặc điền tên campaign' });
+  // Only the email is required. A slot with just a time already does the job of
+  // warning colleagues that the channel is taken, so the rest gets a default
+  // rather than a validation error.
+  const title = clean(b.title, 500) || '(Chưa đặt tên)';
+  const campaign_id = await resolveCampaign(clean(b.campaign, 300) || 'Chưa phân loại');
 
   const dates = Array.isArray(b.dates) ? b.dates.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
   const times = Array.isArray(b.times) && b.times.length

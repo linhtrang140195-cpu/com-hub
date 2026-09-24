@@ -501,8 +501,9 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
   const [dates, setDates] = useState([dateKey]);
   const [times, setTimes] = useState(['09:00']);
   const [weeks, setWeeks] = useState(1);
-  const [campaign, setCampaign] = useState(meta.campaigns?.[0]?.name || '');
-  const [postType, setPostType] = useState('Preview');
+  // Nothing preselected: a wrong default is worse than none when the field is optional.
+  const [campaign, setCampaign] = useState('');
+  const [postType, setPostType] = useState('');
   const [title, setTitle] = useState('');
   const [channels, setChannels] = useState(['SeaTalk']);
   const [owner, setOwner] = useState('self');
@@ -533,9 +534,9 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
     set(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
 
   const save = async () => {
+    // Only the email is required — it is what lets you edit or cancel the slot
+    // later. Everything else can be filled in afterwards.
     if (!EMAIL_RE.test(me.trim())) return setErr('Điền email công ty của bạn ở góc trên bên phải trước đã.');
-    if (!title.trim()) return setErr('Điền tiêu đề bài.');
-    if (!campaign.trim()) return setErr('Chọn hoặc điền tên campaign.');
     if (!dates.length) return setErr('Chọn ít nhất một ngày.');
     if (!times.length) return setErr('Chọn ít nhất một giờ.');
     setSaving(true);
@@ -677,34 +678,24 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
 
           <div className="h-px bg-slate-100" />
 
-          {/* Campaign + type — pick a suggestion or type anything */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label>Campaign</Label>
-              <input
-                list="pt-campaigns" value={campaign} onChange={e => setCampaign(e.target.value)}
-                placeholder="Chọn hoặc tự điền"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13.5px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
-              />
-              <datalist id="pt-campaigns">
-                {(meta.campaigns || []).map(c => <option key={c.name} value={c.name} />)}
-              </datalist>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Loại bài</Label>
-              <input
-                list="pt-types" value={postType} onChange={e => setPostType(e.target.value)}
-                placeholder="Chọn hoặc tự điền"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13.5px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
-              />
-              <datalist id="pt-types">
-                {typeOptions.map(t => <option key={t} value={t} />)}
-              </datalist>
-            </div>
-          </div>
+          <PickOrType
+            label="Campaign"
+            options={(meta.campaigns || []).map(c => c.name)}
+            value={campaign}
+            onChange={setCampaign}
+            placeholder="Tên campaign mới"
+          />
+
+          <PickOrType
+            label="Loại bài"
+            options={typeOptions}
+            value={postType}
+            onChange={setPostType}
+            placeholder="Loại bài khác"
+          />
 
           <div className="flex flex-col gap-1.5">
-            <Label>Tiêu đề bài</Label>
+            <Label>Tiêu đề bài <span className="normal-case tracking-normal text-slate-300 font-semibold">· không bắt buộc</span></Label>
             <textarea
               value={title} onChange={e => setTitle(e.target.value)} rows={2}
               placeholder="VD: Preview trận T7 Quân vs SBTC — Vòng bảng"
@@ -741,6 +732,39 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
 
 function Label({ children }) {
   return <span className="text-[10.5px] font-bold tracking-[0.07em] uppercase text-slate-400">{children}</span>;
+}
+
+// Pick from what the team already uses, or type something new. The chips have
+// to be visible: behind a datalist the options read as a plain text box and
+// nobody discovers they can choose.
+function PickOrType({ label, options, value, onChange, placeholder }) {
+  const [custom, setCustom] = useState(Boolean(value) && !options.includes(value));
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{label} <span className="normal-case tracking-normal text-slate-300 font-semibold">· không bắt buộc</span></Label>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(o => (
+          <Chip
+            key={o}
+            on={!custom && value === o}
+            onClick={() => { setCustom(false); onChange(value === o ? '' : o); }}
+          >
+            {o}
+          </Chip>
+        ))}
+        <Chip on={custom} onClick={() => { setCustom(!custom); onChange(''); }}>+ Tự điền</Chip>
+      </div>
+      {custom && (
+        <input
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoFocus
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13.5px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
+        />
+      )}
+    </div>
+  );
 }
 
 function Chip({ on, onClick, children }) {
