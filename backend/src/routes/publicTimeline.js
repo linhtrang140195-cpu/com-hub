@@ -121,6 +121,19 @@ router.get('/posts', async (req, res) => {
   });
 });
 
+// GET /api/public/nearest-week — the scheduled date closest to today, so an
+// empty week can point somewhere useful instead of just looking broken.
+router.get('/nearest-week', async (_req, res) => {
+  const { rows } = await query(
+    `SELECT DATE_FORMAT(p.scheduled_at, '%Y-%m-%d') AS date
+     FROM posts p JOIN campaigns c ON c.id = p.campaign_id
+     WHERE c.status != 'archived'
+     ORDER BY ABS(DATEDIFF(p.scheduled_at, NOW())) ASC
+     LIMIT 1`
+  );
+  res.json({ date: rows[0]?.date || null });
+});
+
 // GET /api/public/history?limit= — everything already posted, newest first
 router.get('/history', async (req, res) => {
   // Clamped to an integer above, so it is safe to inline — mysql2 rejects a

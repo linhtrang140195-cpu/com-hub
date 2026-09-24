@@ -72,6 +72,7 @@ export default function PublicTimeline() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [editingTime, setEditingTime] = useState(null); // { id, value }
+  const [nearest, setNearest] = useState(null);
 
   const weekStart = startOfWeek(new Date(), weekOffset);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -178,6 +179,22 @@ export default function PublicTimeline() {
 
   const todayKey = toDateInputValue(new Date());
   const rangeLabel = `${formatDateShort(days[0])} – ${formatDateShort(days[6])}`;
+
+  // An empty week reads as "the board is broken" when the schedule actually
+  // lives in another week, so point at the nearest one that has anything.
+  useEffect(() => {
+    if (loading || posts.length) { setNearest(null); return; }
+    api.get('/public/nearest-week')
+      .then(d => setNearest(d?.date || null))
+      .catch(() => setNearest(null));
+  }, [loading, posts.length, weekOffset]);
+
+  const jumpToNearest = () => {
+    if (!nearest) return;
+    const target = startOfWeek(new Date(`${nearest}T12:00:00+07:00`), 0);
+    const thisMon = startOfWeek(new Date(), 0);
+    setWeekOffset(Math.round((target - thisMon) / (7 * 86400000)));
+  };
 
   return (
     <div className="min-h-screen bg-[#F6F7FB]">
@@ -298,6 +315,15 @@ export default function PublicTimeline() {
                 </button>
               )}
             </div>
+
+            {nearest && (
+              <div className="mb-3 px-4 py-3 bg-[#EEF3FF] border border-[#C7D5F5] rounded-xl text-[12.5px] text-slate-700 flex items-center gap-2 flex-wrap">
+                <span>Tuần này chưa ai đặt slot. Lịch gần nhất có bài là <b>{formatDateShort(nearest)}</b>.</span>
+                <button onClick={jumpToNearest} className="font-bold text-[#4B6FE0] hover:underline cursor-pointer">
+                  Xem tuần đó →
+                </button>
+              </div>
+            )}
 
             {/* Grid */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
