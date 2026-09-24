@@ -1,19 +1,26 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+// Only same-origin relative paths, so ?next= cannot bounce anyone off-site.
+export function safeNext(raw) {
+  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [localError, setLocalError] = useState('');
   const { login, loading } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = safeNext(params.get('next'));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLocalError('');
     try {
       const user = await login(email);
-      navigate(user.role === 'admin' ? '/admin/timeline' : '/operator/today');
+      navigate(next || (user.role === 'admin' ? '/admin/timeline' : '/operator/today'));
     } catch (err) {
       setLocalError(err.message);
     }

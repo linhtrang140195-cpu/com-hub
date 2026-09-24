@@ -1,6 +1,6 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginPage from './pages/LoginPage';
+import LoginPage, { safeNext } from './pages/LoginPage';
 import Layout from './components/layout/Layout';
 import MasterTimeline from './components/admin/MasterTimeline';
 import MasterCalendar from './components/admin/MasterCalendar';
@@ -24,6 +24,14 @@ function ProtectedRoute({ children, role }) {
   return children;
 }
 
+// Someone already signed in who lands on /login goes where ?next= asked for,
+// so the public board's "log in as admin" link returns to the board.
+function LoggedInRedirect({ user }) {
+  const [params] = useSearchParams();
+  const next = safeNext(params.get('next'));
+  return <Navigate to={next || (user.role === 'admin' ? '/admin/timeline' : '/operator/today')} replace />;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
 
@@ -32,7 +40,7 @@ function AppRoutes() {
       {/* Open to everyone — no login, no Layout chrome */}
       <Route path="/timeline" element={<PublicTimeline />} />
 
-      <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin/timeline' : '/operator/today'} replace /> : <LoginPage />} />
+      <Route path="/login" element={user ? <LoggedInRedirect user={user} /> : <LoginPage />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         {/* Admin */}

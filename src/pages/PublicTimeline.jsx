@@ -257,7 +257,7 @@ export default function PublicTimeline() {
               <span className="text-[10.5px] font-semibold text-[#E94560]">Email chưa đúng định dạng</span>
             )}
             {!isAdmin && (
-              <a href="/login" className="text-[10.5px] text-slate-400 hover:text-[#E94560] hover:underline">
+              <a href="/login?next=/timeline" className="text-[10.5px] text-slate-400 hover:text-[#E94560] hover:underline">
                 Là admin? Đăng nhập để sắp xếp lịch cả team ↗
               </a>
             )}
