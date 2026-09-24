@@ -12,6 +12,13 @@ function getToken() {
   }
 }
 
+function clearSession() {
+  try {
+    localStorage.removeItem('commshub_token');
+    localStorage.removeItem('commshub_user');
+  } catch { /* private mode */ }
+}
+
 async function request(path, { method = 'GET', body, headers = {}, isFormData = false } = {}) {
   const token = getToken();
   const finalHeaders = { ...headers };
@@ -26,6 +33,18 @@ async function request(path, { method = 'GET', body, headers = {}, isFormData = 
 
   const contentType = res.headers.get('content-type') || '';
   const data = contentType.includes('application/json') ? await res.json() : await res.text();
+
+  // A 401 while holding a token means the session is no longer good — expired,
+  // or left over from before tokens existed. Clear it and send the person to
+  // log in, rather than letting screen after screen fail and render blank.
+  // Without a token a 401 is expected (the public board probes admin-only
+  // endpoints on purpose), so that case just throws like any other error.
+  if (res.status === 401 && token) {
+    clearSession();
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+    }
+  }
 
   if (!res.ok) {
     throw new Error(data?.error || `Request failed (${res.status})`);

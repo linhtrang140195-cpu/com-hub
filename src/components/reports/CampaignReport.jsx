@@ -16,25 +16,35 @@ export default function CampaignReport() {
   const { campaignId } = useParams();
   const [data, setData] = useState(null);
   const [campaignType, setCampaignType] = useState(null);
+  // Every hook must run on every render — this one used to sit below the
+  // early return, so it appeared only once data had loaded and React threw
+  // "rendered more hooks than during the previous render", blanking the page.
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api.get(`/reports/campaign/${campaignId}`).then(d => {
       setData(d);
       return api.get(`/campaign-types/${d.campaign.type}`);
-    }).then(setCampaignType).catch(console.error);
+    }).then(setCampaignType).catch(e => setError(e.message));
   }, [campaignId]);
-
-  if (!data) return <div className="text-sm text-slate-400">Đang tải...</div>;
-  const { campaign, summary, engagement, top_posts, by_post_type } = data;
-
-  const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
     setExporting(true);
-    try { await downloadExcel(campaignId, campaign.name); }
+    try { await downloadExcel(campaignId, data.campaign.name); }
     catch (e) { alert('Lỗi xuất Excel: ' + e.message); }
     finally { setExporting(false); }
   };
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-800">
+        Không tải được báo cáo: {error}
+      </div>
+    );
+  }
+  if (!data) return <div className="text-sm text-slate-400">Đang tải...</div>;
+  const { campaign, summary, engagement, top_posts, by_post_type } = data;
 
   return (
     <div>
