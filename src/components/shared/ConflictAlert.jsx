@@ -27,7 +27,8 @@ export default function ConflictAlert({ conflicts, posts }) {
             if (!a || !b) return null;
             return (
               <li key={i}>
-                "{a.title}" và "{b.title}" cùng kênh, cách nhau {c.gap_minutes} phút
+                "{a.title}" và "{b.title}" — cùng kênh{' '}
+                <b>{(c.shared_channels || []).join(', ')}</b>, cách nhau {c.gap_minutes} phút
               </li>
             );
           })}

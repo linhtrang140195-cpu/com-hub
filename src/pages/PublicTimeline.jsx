@@ -5,6 +5,7 @@ import {
   formatDateShort, formatTimeVN, toDateInputValue,
 } from '../utils/datetime';
 import { copyText } from '../services/clipboard';
+import ConflictAlert from '../components/shared/ConflictAlert';
 
 const DOW = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 // Brief form the requester fills in when they ask the IC team to write the post.
@@ -73,6 +74,11 @@ export default function PublicTimeline() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [editingTime, setEditingTime] = useState(null); // { id, value }
   const [nearest, setNearest] = useState(null);
+  const [conflicts, setConflicts] = useState([]);
+  const conflictIds = useMemo(
+    () => new Set(conflicts.flatMap(c => [c.post_a, c.post_b])),
+    [conflicts]
+  );
 
   const weekStart = startOfWeek(new Date(), weekOffset);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -81,7 +87,11 @@ export default function PublicTimeline() {
   const load = useCallback(() => {
     setLoading(true);
     api.get(`/public/posts?from=${weekStart.toISOString()}&to=${weekEnd.toISOString()}`)
-      .then(d => { setPosts(d.posts || []); setIsAdmin(Boolean(d.is_admin)); })
+      .then(d => {
+        setPosts(d.posts || []);
+        setConflicts(d.conflicts || []);
+        setIsAdmin(Boolean(d.is_admin));
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,6 +326,8 @@ export default function PublicTimeline() {
               )}
             </div>
 
+            <ConflictAlert conflicts={conflicts} posts={posts} />
+
             {nearest && (
               <div className="mb-3 px-4 py-3 bg-[#EEF3FF] border border-[#C7D5F5] rounded-xl text-[12.5px] text-slate-700 flex items-center gap-2 flex-wrap">
                 <span>Tuần này chưa ai đặt slot. Lịch gần nhất có bài là <b>{formatDateShort(nearest)}</b>.</span>
@@ -360,6 +372,7 @@ export default function PublicTimeline() {
                                         Boolean(emailOk && p.operator_email &&
                                                 p.operator_email.toLowerCase() === me.toLowerCase())}
                                   isAdmin={isAdmin}
+                                  conflict={conflictIds.has(p.id)}
                                   editingTime={editingTime}
                                   setEditingTime={setEditingTime}
                                   onTimeSave={() => handleTimeSave(p)}
@@ -427,15 +440,21 @@ export default function PublicTimeline() {
 }
 
 /* ── Slot card ───────────────────────────────────────── */
-function SlotCard({ post: p, mine, isAdmin, editingTime, setEditingTime, onTimeSave, onDelete, onTogglePosted }) {
+function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTime, onTimeSave, onDelete, onTogglePosted }) {
   const posted = p.status === 'posted';
   const canEdit = mine || isAdmin;
   const isIC = p.post_owner === 'ic';
   const editing = editingTime?.id === p.id;
 
+  const shell = posted
+    ? 'bg-emerald-50/60 border-emerald-200'
+    : conflict
+      ? 'bg-amber-50 border-amber-300'
+      : 'bg-white border-slate-200 hover:border-slate-300';
+
   return (
     <div
-      className={`group relative rounded-lg border p-2 pl-2.5 ${posted ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}
+      className={`group relative rounded-lg border p-2 pl-2.5 ${shell}`}
       style={{ borderLeft: `3px solid ${p.campaign_color || '#CBD5E1'}` }}
     >
       <div className="flex items-center gap-1.5 mb-1">
@@ -472,7 +491,15 @@ function SlotCard({ post: p, mine, isAdmin, editingTime, setEditingTime, onTimeS
             {isIC ? 'IC' : 'TỰ'}
           </span>
         )}
-        {!editing && p.post_type && (
+        {!editing && conflict && (
+          <span
+            className="text-[9px] font-extrabold uppercase bg-amber-200 text-amber-900 rounded px-1.5 py-px shrink-0"
+            title="Có bài khác đăng cùng kênh, cách nhau dưới 30 phút"
+          >
+            ⚠ Trùng
+          </span>
+        )}
+        {!editing && !conflict && p.post_type && (
           <span className="text-[9.5px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-px truncate max-w-[66px]">
             {p.post_type}
           </span>
@@ -808,37 +835,72 @@ function Chip({ on, onClick, children }) {
 }
 
 /* ── Team webhook (admin only) ───────────────────────── */
-function TeamWebhookPanel() {
+function WebhookRow({ title, hint, endpoint, canTestWhenEmpty }) {
   const [url, setUrl] = useState('');
-  const [envFallback, setEnvFallback] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [state, setState] = useState('');   // '' | 'saving' | 'saved' | 'testing' | 'sent'
   const [err, setErr] = useState('');
-  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    api.get('/settings/team-webhook')
-      .then(d => { setUrl(d.url || ''); setEnvFallback(Boolean(d.env_fallback)); })
-      .catch(() => {});
-  }, []);
+    api.get(`/settings/${endpoint}`)
+      .then(d => { setUrl(d.url || ''); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [endpoint]);
 
-  const save = async () => {
-    setState('saving'); setErr('');
+  const run = async (kind) => {
+    setState(kind === 'save' ? 'saving' : 'testing'); setErr('');
     try {
-      await api.patch('/settings/team-webhook', { url });
-      setState('saved');
-      setTimeout(() => setState(''), 2200);
+      if (kind === 'save') await api.patch(`/settings/${endpoint}`, { url });
+      else await api.post(`/settings/${endpoint}/test`, {});
+      setState(kind === 'save' ? 'saved' : 'sent');
+      setTimeout(() => setState(''), 2400);
     } catch (e) { setErr(e.message); setState(''); }
   };
 
-  const test = async () => {
-    setState('testing'); setErr('');
-    try {
-      await api.post('/settings/team-webhook/test', {});
-      setState('sent');
-      setTimeout(() => setState(''), 2600);
-    } catch (e) { setErr(e.message); setState(''); }
-  };
+  return (
+    <div className="flex flex-col gap-2 py-3 border-t border-slate-100 first:border-t-0 first:pt-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[12.5px] font-bold">{title}</span>
+        <span className={`text-[10px] font-bold uppercase rounded px-1.5 py-px ${
+          url ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+        }`}>
+          {url ? 'Đã cấu hình' : canTestWhenEmpty ? 'Dùng group chung' : 'Chưa cấu hình'}
+        </span>
+      </div>
+      <div className="text-[11.5px] text-slate-500 leading-relaxed">{hint}</div>
+      <div className="flex gap-2 flex-wrap">
+        <input
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://openapi.seatalk.io/webhook/group/..."
+          className="flex-1 min-w-[280px] border border-slate-200 rounded-lg px-3 py-2 text-[12.5px] font-mono outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
+        />
+        <button
+          onClick={() => run('save')}
+          disabled={!loaded || state === 'saving'}
+          className={`rounded-lg px-4 py-2 text-[12.5px] font-bold text-white cursor-pointer disabled:opacity-50 ${
+            state === 'saved' ? 'bg-emerald-600' : 'bg-[#14161F] hover:bg-[#2A2D3A]'
+          }`}
+        >
+          {state === 'saving' ? 'Đang lưu…' : state === 'saved' ? '✓ Đã lưu' : 'Lưu'}
+        </button>
+        <button
+          onClick={() => run('test')}
+          disabled={state === 'testing' || (!url && !canTestWhenEmpty)}
+          className={`rounded-lg px-4 py-2 text-[12.5px] font-bold border cursor-pointer disabled:opacity-50 ${
+            state === 'sent' ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-slate-200 hover:border-slate-400'
+          }`}
+        >
+          {state === 'testing' ? 'Đang gửi…' : state === 'sent' ? '✓ Đã gửi!' : '🔔 Gửi thử'}
+        </button>
+      </div>
+      {err && <div className="text-[12px] font-semibold text-[#E94560] bg-red-50 rounded-lg px-3 py-2">{err}</div>}
+    </div>
+  );
+}
 
+function TeamWebhookPanel() {
+  const [open, setOpen] = useState(false);
   return (
     <div className="mt-3 bg-white border border-slate-200 rounded-xl overflow-hidden">
       <button
@@ -846,48 +908,26 @@ function TeamWebhookPanel() {
         className="w-full flex items-center gap-2 px-5 py-3 text-left cursor-pointer hover:bg-slate-50"
       >
         <span className="text-[13px] font-extrabold">⚙️ Bot gửi SeaTalk</span>
-        <span className={`text-[10px] font-bold uppercase rounded px-1.5 py-px ${
-          url || envFallback ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-        }`}>
-          {url ? 'Đã cấu hình' : envFallback ? 'Đang dùng env var' : 'Chưa cấu hình'}
-        </span>
+        <span className="text-[11px] text-slate-400">— chỉ admin thấy phần này</span>
         <span className="ml-auto text-slate-400 text-[12px]">{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
-        <div className="px-5 pb-4 pt-1 border-t border-slate-100 flex flex-col gap-2.5">
-          <div className="text-[11.5px] text-slate-500 leading-relaxed">
-            Digest 08:00 mỗi sáng gửi vào group này cho các campaign chưa có webhook riêng.
-            Lấy URL: group SeaTalk → <b>Settings → Integrations → Incoming Webhook</b>.
-            Chỉ admin thấy ô này.
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <input
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder="https://openapi.seatalk.io/webhook/group/..."
-              className="flex-1 min-w-[280px] border border-slate-200 rounded-lg px-3 py-2 text-[12.5px] font-mono outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
-            />
-            <button
-              onClick={save}
-              disabled={state === 'saving'}
-              className={`rounded-lg px-4 py-2 text-[12.5px] font-bold text-white cursor-pointer disabled:opacity-50 ${
-                state === 'saved' ? 'bg-emerald-600' : 'bg-[#14161F] hover:bg-[#2A2D3A]'
-              }`}
-            >
-              {state === 'saving' ? 'Đang lưu…' : state === 'saved' ? '✓ Đã lưu' : 'Lưu'}
-            </button>
-            <button
-              onClick={test}
-              disabled={state === 'testing' || (!url && !envFallback)}
-              className={`rounded-lg px-4 py-2 text-[12.5px] font-bold border cursor-pointer disabled:opacity-50 ${
-                state === 'sent' ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-slate-200 hover:border-slate-400'
-              }`}
-            >
-              {state === 'testing' ? 'Đang gửi…' : state === 'sent' ? '✓ Đã gửi!' : '🔔 Gửi thử'}
-            </button>
-          </div>
-          {err && <div className="text-[12px] font-semibold text-[#E94560] bg-red-50 rounded-lg px-3 py-2">{err}</div>}
+        <div className="px-5 pb-3 border-t border-slate-100">
+          <WebhookRow
+            endpoint="team-webhook"
+            title="📅 Digest lịch hằng ngày"
+            hint={<>Gửi 08:00 mỗi sáng vào group chung, cho các campaign chưa có webhook riêng.
+              Lấy URL: group SeaTalk → <b>Settings → Integrations → Incoming Webhook</b>.</>}
+          />
+          <WebhookRow
+            endpoint="ic-webhook"
+            title="🔔 Báo ngay khi có người nhờ IC đăng"
+            canTestWhenEmpty
+            hint={<>Bắn thông báo <b>ngay lúc đặt slot</b>, không đợi tới sáng hôm sau.
+              Muốn báo riêng cho mình thì tạo một group SeaTalk chỉ có bạn rồi dán webhook của
+              group đó vào đây. Để trống thì dùng chung group digest ở trên.</>}
+          />
         </div>
       )}
     </div>

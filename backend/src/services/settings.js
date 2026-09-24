@@ -18,7 +18,14 @@ export async function setSetting(key, value, updatedBy) {
 }
 
 export const TEAM_WEBHOOK_KEY = 'team_seatalk_webhook_url';
+export const IC_WEBHOOK_KEY = 'ic_request_seatalk_webhook_url';
 
 export function getTeamWebhook() {
   return getSetting(TEAM_WEBHOOK_KEY, process.env.SEATALK_WEBHOOK_URL);
+}
+
+// Where "please write this for me" requests land. Defaults to the team group
+// when no separate destination is set.
+export async function getIcRequestWebhook() {
+  return (await getSetting(IC_WEBHOOK_KEY, null)) || (await getTeamWebhook());
 }

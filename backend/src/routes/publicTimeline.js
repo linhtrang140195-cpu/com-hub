@@ -1,5 +1,48 @@
 import { Router } from 'express';
 import { query, newId } from '../db.js';
+import { getIcRequestWebhook } from '../services/settings.js';
+import { detectConflicts } from '../services/conflictDetect.js';
+
+const IC_BRIEF_FORM = 'https://forms.gle/fSP29o5daJKDje2G6';
+
+// An IC request is work landing on the team, so it is pushed straight away
+// rather than waiting for the 08:00 digest. Never blocks the booking: a
+// webhook that is unset or failing must not cost the user their slot.
+async function notifyIcRequest(req, { email, campaign, post_type, title, channels, slots }) {
+  const url = await getIcRequestWebhook();
+  if (!url) return;
+
+  const first = slots[0];
+  const when = first
+    ? new Intl.DateTimeFormat('vi-VN', {
+        weekday: 'long', day: '2-digit', month: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+        timeZone: 'Asia/Ho_Chi_Minh',
+      }).format(first)
+    : '—';
+
+  const board = `${req.protocol}://${req.get('host')}/timeline`;
+  const text = [
+    '🔔 YÊU CẦU IC ĐĂNG BÀI',
+    '',
+    `Người yêu cầu: ${email}`,
+    `Campaign: ${campaign}`,
+    `Loại bài: ${post_type}`,
+    `Tiêu đề: ${title}`,
+    channels.length ? `Kênh: ${channels.join(', ')}` : null,
+    `Lịch đăng: ${when}${slots.length > 1 ? ` (+${slots.length - 1} slot nữa)` : ''}`,
+    '',
+    `📝 Nội dung chi tiết: ${IC_BRIEF_FORM}`,
+    `📅 Xem lịch: ${board}`,
+  ].filter(Boolean).join('\n');
+
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag: 'text', text: { content: text } }),
+  });
+  if (!r.ok) throw new Error(`SeaTalk ${r.status}`);
+}
 
 const router = Router();
 
@@ -115,10 +158,10 @@ router.get('/posts', async (req, res) => {
      ORDER BY p.scheduled_at ASC`,
     params
   );
-  res.json({
-    posts: rows.map(r => ({ ...r, channels: r.channels || [] })),
-    is_admin: isAdmin(req),
-  });
+  const posts = rows.map(r => ({ ...r, channels: r.channels || [] }));
+  // Same channel within 30 minutes clashes; two posts at 09:00 on SeaTalk and
+  // Email do not — which is the whole point of booking by channel.
+  res.json({ posts, conflicts: detectConflicts(posts), is_admin: isAdmin(req) });
 });
 
 // GET /api/public/nearest-week — the scheduled date closest to today, so an
@@ -191,6 +234,7 @@ router.post('/posts', async (req, res) => {
   const post_owner = normaliseOwner(b.post_owner);
 
   const created = [];
+  const when_list = [];
   for (let w = 0; w < weeks; w++) {
     for (const date of dates) {
       for (const time of times) {
@@ -205,11 +249,27 @@ router.post('/posts', async (req, res) => {
            b.public_key, email, series_id, post_owner]
         );
         created.push(id);
+        when_list.push(when);
       }
     }
   }
 
-  res.json({ created: created.length, series_id, ids: created });
+  let notified = false;
+  if (post_owner === 'ic' && created.length) {
+    const { rows: c } = await query('SELECT name FROM campaigns WHERE id = ?', [campaign_id]);
+    try {
+      await notifyIcRequest(req, {
+        email, campaign: c[0]?.name || '—', post_type, title, channels,
+        slots: when_list.sort((a, b) => a - b),
+      });
+      notified = true;
+    } catch (e) {
+      // The booking already succeeded; a failed ping must not undo it.
+      console.error('[ic-request-notify]', e.message);
+    }
+  }
+
+  res.json({ created: created.length, series_id, ids: created, notified });
 });
 
 // PATCH /api/public/posts/:id — submitter edits their own slot
