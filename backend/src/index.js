@@ -28,6 +28,7 @@ import reportRoutes from './routes/reports.js';
 import seatalkRoutes from './routes/seatalk.js';
 import tournamentRoutes from './routes/tournament.js';
 import reflectionRoutes from './routes/reflections.js';
+import publicTimelineRoutes from './routes/publicTimeline.js';
 import { sendWebhookReminder, sendWeeklyWebhookReminder } from './services/seatalkReminder.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 import { syncPostsFromWebsite } from './services/tournamentService.js';
@@ -45,6 +46,10 @@ app.use(express.json({ limit: '10mb' }));
 app.get('/health', (_, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 app.use('/api', attachUser);
+
+// Open board — no login. Registered before the rest so it is obvious these
+// endpoints are deliberately unauthenticated.
+app.use('/api/public', publicTimelineRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

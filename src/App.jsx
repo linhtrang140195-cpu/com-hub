@@ -13,6 +13,7 @@ import BenchmarkReport from './components/reports/BenchmarkReport';
 import TodayChecklist from './components/operator/TodayChecklist';
 import CaptionGenerator from './components/operator/CaptionGenerator';
 import PostHistory from './components/operator/PostHistory';
+import PublicTimeline from './pages/PublicTimeline';
 
 function ProtectedRoute({ children, role }) {
   const { user } = useAuth();
@@ -28,6 +29,9 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Open to everyone — no login, no Layout chrome */}
+      <Route path="/timeline" element={<PublicTimeline />} />
+
       <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin/timeline' : '/operator/today'} replace /> : <LoginPage />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

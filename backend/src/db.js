@@ -71,6 +71,13 @@ async function runMigrations() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       updated_by VARCHAR(255)
     )` },
+    // Public timeline: slots registered without logging in. public_key is a
+    // browser-held random token — the only thing letting an anonymous submitter
+    // edit or delete the row they created. submitted_by is their typed name.
+    { name: 'posts.public_key', sql: 'ALTER TABLE posts ADD COLUMN public_key VARCHAR(64) NULL AFTER operator_email' },
+    { name: 'posts.submitted_by', sql: 'ALTER TABLE posts ADD COLUMN submitted_by VARCHAR(255) NULL AFTER public_key' },
+    { name: 'posts.series_id', sql: 'ALTER TABLE posts ADD COLUMN series_id VARCHAR(64) NULL AFTER submitted_by' },
+    { name: 'posts.idx_public', sql: 'CREATE INDEX idx_posts_public ON posts (public_key)' },
   ];
   const conn = await pool.getConnection();
   try {
