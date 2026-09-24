@@ -64,11 +64,24 @@ export const CHANNEL_METRICS = {
 //
 // Rates are stored as counts, never as a percentage: a stored "65%" cannot be
 // re-aggregated across several posts, a participant count can.
+// For anything with a turnout, registrations matter as much as attendance:
+// attendance alone cannot tell you whether the announcement under-sold the
+// event or the reminders failed. Attendance ÷ registrations separates those,
+// and it is the number internal comms can actually act on.
 const GOAL_METRICS = {
   giai_dau: [{ key: 'live_views', label: 'Lượt xem livestream' }],
-  van_hoa: [{ key: 'participants', label: 'Số người tham gia', hint: 'Số người, không phải %' }],
-  event: [{ key: 'attendance', label: 'Số người tham dự' }],
+  van_hoa: [
+    { key: 'registrations', label: 'Số đăng ký' },
+    { key: 'participants', label: 'Số người tham gia', hint: 'Số người, không phải %' },
+  ],
+  event: [
+    { key: 'invited', label: 'Số người được mời', hint: 'Để trống nếu mời toàn công ty' },
+    { key: 'registrations', label: 'Số đăng ký', hint: 'Số response của form đăng ký' },
+    { key: 'attendance', label: 'Số người đến', hint: 'Check-in tại cửa' },
+    { key: 'feedback_responses', label: 'Số phản hồi', hint: 'Số người điền form sau sự kiện' },
+  ],
   lnd: [
+    { key: 'registrations', label: 'Số đăng ký' },
     { key: 'attendance', label: 'Số người tham dự' },
     { key: 'completed', label: 'Số người hoàn thành' },
   ],
