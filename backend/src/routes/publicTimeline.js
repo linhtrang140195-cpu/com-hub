@@ -106,8 +106,12 @@ async function resolveCampaign(name) {
   const clean_name = clean(name, 300);
   if (!clean_name) return null;
 
+  // Archived campaigns are excluded from every public read (`c.status !=
+  // 'archived'`), so reusing one here would silently swallow the post: the
+  // insert succeeds, the id is real, but it can never come back out of any
+  // query. Only an active-or-draft match is safe to reuse.
   const { rows } = await query(
-    'SELECT id FROM campaigns WHERE LOWER(name) = LOWER(?) ORDER BY (status = \'active\') DESC LIMIT 1',
+    "SELECT id FROM campaigns WHERE LOWER(name) = LOWER(?) AND status != 'archived' LIMIT 1",
     [clean_name]
   );
   if (rows.length) return rows[0].id;
