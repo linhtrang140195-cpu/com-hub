@@ -954,11 +954,11 @@ function TeamWebhookPanel() {
           />
           <WebhookRow
             endpoint="ic-webhook"
-            title="🔔 Báo ngay khi có người nhờ IC đăng"
+            title="🔔 Báo ngay khi có người đặt slot"
             canTestWhenEmpty
-            hint={<>Bắn thông báo <b>ngay lúc đặt slot</b>, không đợi tới sáng hôm sau.
-              Muốn báo riêng cho mình thì tạo một group SeaTalk chỉ có bạn rồi dán webhook của
-              group đó vào đây. Để trống thì dùng chung group digest ở trên.</>}
+            hint={<>Bắn thông báo <b>ngay lúc ai đó đặt slot</b> — cả tự đăng lẫn nhờ IC — không đợi
+              tới sáng hôm sau. Muốn báo riêng cho mình thì tạo một group SeaTalk chỉ có bạn rồi dán
+              webhook của group đó vào đây. Để trống thì dùng chung group digest ở trên.</>}
           />
         </div>
       )}

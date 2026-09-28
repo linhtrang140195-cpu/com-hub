@@ -5,10 +5,11 @@ import { detectConflicts } from '../services/conflictDetect.js';
 
 const IC_BRIEF_FORM = 'https://forms.gle/fSP29o5daJKDje2G6';
 
-// An IC request is work landing on the team, so it is pushed straight away
-// rather than waiting for the 08:00 digest. Never blocks the booking: a
-// webhook that is unset or failing must not cost the user their slot.
-async function notifyIcRequest(req, { email, campaign, post_type, title, channels, slots }) {
+// Every booking pings the admin's own SeaTalk destination the moment it is
+// made, rather than waiting for the 08:00 digest — that is the whole point of
+// a live board. Never blocks the booking itself: a webhook that is unset or
+// failing must not cost the submitter their slot.
+async function notifyNewBooking(req, { email, campaign, post_type, title, channels, slots, post_owner }) {
   const url = await getIcRequestWebhook();
   if (!url) return;
 
@@ -22,17 +23,18 @@ async function notifyIcRequest(req, { email, campaign, post_type, title, channel
     : '—';
 
   const board = `${req.protocol}://${req.get('host')}/timeline`;
+  const isIcRequest = post_owner === 'ic';
   const text = [
-    '🔔 YÊU CẦU IC ĐĂNG BÀI',
+    isIcRequest ? '🔔 YÊU CẦU IC ĐĂNG BÀI' : '📌 SLOT MỚI ĐƯỢC ĐẶT',
     '',
-    `Người yêu cầu: ${email}`,
+    `Người đặt: ${email}`,
     `Campaign: ${campaign}`,
     `Loại bài: ${post_type}`,
     `Tiêu đề: ${title}`,
     channels.length ? `Kênh: ${channels.join(', ')}` : null,
     `Lịch đăng: ${when}${slots.length > 1 ? ` (+${slots.length - 1} slot nữa)` : ''}`,
     '',
-    `📝 Nội dung chi tiết: ${IC_BRIEF_FORM}`,
+    isIcRequest ? `📝 Nội dung chi tiết: ${IC_BRIEF_FORM}` : null,
     `📅 Xem lịch: ${board}`,
   ].filter(Boolean).join('\n');
 
@@ -259,17 +261,17 @@ router.post('/posts', async (req, res) => {
   }
 
   let notified = false;
-  if (post_owner === 'ic' && created.length) {
+  if (created.length) {
     const { rows: c } = await query('SELECT name FROM campaigns WHERE id = ?', [campaign_id]);
     try {
-      await notifyIcRequest(req, {
-        email, campaign: c[0]?.name || '—', post_type, title, channels,
+      await notifyNewBooking(req, {
+        email, campaign: c[0]?.name || '—', post_type, title, channels, post_owner,
         slots: when_list.sort((a, b) => a - b),
       });
       notified = true;
     } catch (e) {
       // The booking already succeeded; a failed ping must not undo it.
-      console.error('[ic-request-notify]', e.message);
+      console.error('[booking-notify]', e.message);
     }
   }
 

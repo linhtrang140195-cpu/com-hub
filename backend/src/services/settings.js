@@ -24,7 +24,9 @@ export function getTeamWebhook() {
   return getSetting(TEAM_WEBHOOK_KEY, process.env.SEATALK_WEBHOOK_URL);
 }
 
-// Where "please write this for me" requests land. Defaults to the team group
+// Where a live ping lands the moment anyone books a slot on the public board
+// (any post_owner, not just IC requests — the key name is historical).
+// Defaults to the team group
 // when no separate destination is set.
 export async function getIcRequestWebhook() {
   return (await getSetting(IC_WEBHOOK_KEY, null)) || (await getTeamWebhook());
