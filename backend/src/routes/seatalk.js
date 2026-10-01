@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { getTodaySchedule, formatReminderText, sendWebhookReminder, getWeekSchedule, formatWeeklyReminderText, sendWeeklyWebhookReminder, sendCampaignWebhookReminder } from '../services/seatalkReminder.js';
+import { getTodaySchedule, formatReminderText, sendWebhookReminder, getWeekSchedule, formatWeeklyReminderText, sendWeeklyWebhookReminder, sendCampaignWebhookReminder, getTomorrowSchedule, formatTomorrowReminderText, sendTomorrowWebhookReminder } from '../services/seatalkReminder.js';
 
 const router = Router();
 
@@ -60,6 +60,31 @@ router.post('/send-weekly', requireAuth, requireAdmin, async (req, res) => {
     return res.json({ ok: true });
   }
   const result = await sendWeeklyWebhookReminder();
+  res.json(result);
+});
+
+// Returns pre-formatted "tomorrow" reminder text (the 17:00 heads-up)
+router.get('/tomorrow-text', requireAuth, requireAdmin, async (req, res) => {
+  const posts = await getTomorrowSchedule();
+  const text = posts.length ? formatTomorrowReminderText(posts) : '(Không có bài nào ngày mai — sẽ không gửi gì)';
+  res.json({ text, count: posts.length });
+});
+
+// Manual trigger for the tomorrow reminder — same optional custom-text override
+router.post('/send-tomorrow', requireAuth, requireAdmin, async (req, res) => {
+  const { text } = req.body || {};
+  if (text) {
+    const webhookUrl = process.env.SEATALK_WEBHOOK_URL;
+    if (!webhookUrl) return res.json({ ok: false, reason: 'SEATALK_WEBHOOK_URL not configured' });
+    const r = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag: 'text', text: { content: text } }),
+    });
+    if (!r.ok) throw new Error(`SeaTalk webhook error: ${r.status}`);
+    return res.json({ ok: true });
+  }
+  const result = await sendTomorrowWebhookReminder();
   res.json(result);
 });
 

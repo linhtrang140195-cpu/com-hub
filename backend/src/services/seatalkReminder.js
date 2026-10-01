@@ -122,6 +122,84 @@ export async function sendCampaignWebhookReminder(campaignId, customText) {
   return { ok: true };
 }
 
+// Posts scheduled for tomorrow (VN calendar day) — a heads-up sent the
+// evening before, distinct from the same-day 08:00 digest above.
+export async function getTomorrowSchedule() {
+  const tz = 'Asia/Ho_Chi_Minh';
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+  const startLocal = new Date(now); startLocal.setDate(startLocal.getDate() + 1); startLocal.setHours(0, 0, 0, 0);
+  const endLocal = new Date(startLocal); endLocal.setHours(23, 59, 59, 999);
+  const offset = 7 * 60 * 60 * 1000;
+  const start = new Date(startLocal.getTime() - offset);
+  const end = new Date(endLocal.getTime() - offset);
+
+  const { rows } = await query(
+    `SELECT p.id, p.title, p.post_type, p.scheduled_at, p.status, p.approval_status,
+            p.operator_email, p.channels, p.submitted_by, p.post_owner,
+            c.id AS campaign_id, c.name AS campaign_name, c.seatalk_webhook_url AS campaign_webhook_url
+     FROM posts p
+     JOIN campaigns c ON c.id = p.campaign_id
+     WHERE p.scheduled_at BETWEEN ? AND ?
+       AND p.status != 'skipped'
+       AND c.status != 'archived'
+     ORDER BY p.scheduled_at ASC`,
+    [start.toISOString(), end.toISOString()]
+  );
+  return rows;
+}
+
+export function formatTomorrowReminderText(posts) {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateStr = tomorrow.toLocaleDateString('vi-VN', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  });
+
+  const icCount = posts.filter(p => p.post_owner === 'ic').length;
+  let msg = `🔔 NHẮC LỊCH — NGÀY MAI ${dateStr.toUpperCase()}\n`;
+  msg += `(${posts.length} bài${icCount ? ` • ${icCount} bài IC phụ trách` : ''} • chuẩn bị nội dung trước nhé)\n\n`;
+
+  const sorted = [...posts].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+  for (const p of sorted) {
+    const time = new Date(p.scheduled_at).toLocaleTimeString('vi-VN', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh',
+    });
+    const operator = p.submitted_by || p.operator_email?.split('@')[0] || '—';
+    const channels = Array.isArray(p.channels) ? p.channels.join(', ') : (p.channels || '');
+    const owner = p.post_owner === 'ic' ? ' 🔴 IC đăng' : '';
+    msg += `⏰ [${time}] ${p.title} — @${operator}${owner}`;
+    if (channels) msg += ` (${channels})`;
+    msg += '\n';
+  }
+  return msg.trim();
+}
+
+// Silent when nothing is scheduled tomorrow — this is a heads-up, not a daily
+// ping, so an empty day should produce no message at all rather than
+// "không có bài nào" every evening.
+export async function sendTomorrowWebhookReminder() {
+  const posts = await getTomorrowSchedule();
+  if (!posts.length) return { ok: true, count: 0, sent: false };
+
+  const globalUrl = await getTeamWebhook();
+  const byUrl = new Map();
+  for (const p of posts) {
+    const url = p.campaign_webhook_url || globalUrl;
+    if (!url) continue;
+    if (!byUrl.has(url)) byUrl.set(url, []);
+    byUrl.get(url).push(p);
+  }
+  if (!byUrl.size) return { ok: false, reason: 'Không có webhook URL nào được cấu hình' };
+
+  let total = 0;
+  for (const [url, urlPosts] of byUrl) {
+    await postToWebhook(url, formatTomorrowReminderText(urlPosts));
+    total += urlPosts.length;
+  }
+  return { ok: true, count: total, sent: true };
+}
+
 export async function getWeekSchedule() {
   const tz = 'Asia/Ho_Chi_Minh';
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));

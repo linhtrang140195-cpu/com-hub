@@ -62,7 +62,7 @@ export default function MasterTimeline() {
   const handleOpenPreview = async (type) => {
     setPreviewModal({ type, loading: true });
     try {
-      const endpoint = type === 'daily' ? '/seatalk/today-text' : '/seatalk/week-text';
+      const endpoint = { daily: '/seatalk/today-text', weekly: '/seatalk/week-text', tomorrow: '/seatalk/tomorrow-text' }[type];
       const data = await api.get(endpoint);
       setPreviewText(data.text || '');
       setPreviewModal({ type, loading: false });
@@ -76,7 +76,7 @@ export default function MasterTimeline() {
     if (!previewModal) return;
     setSending(true);
     try {
-      const endpoint = previewModal.type === 'daily' ? '/seatalk/send-reminder' : '/seatalk/send-weekly';
+      const endpoint = { daily: '/seatalk/send-reminder', weekly: '/seatalk/send-weekly', tomorrow: '/seatalk/send-tomorrow' }[previewModal.type];
       const result = await api.post(endpoint, { text: previewText });
       if (result.ok) {
         setSent(true);
@@ -163,6 +163,13 @@ export default function MasterTimeline() {
             className="rounded-lg px-4 py-2.5 text-white text-[13px] font-bold cursor-pointer bg-slate-500 hover:bg-slate-600"
           >
             📅 Lịch hôm nay
+          </button>
+          <button
+            onClick={() => handleOpenPreview('tomorrow')}
+            className="rounded-lg px-4 py-2.5 text-white text-[13px] font-bold cursor-pointer bg-slate-500 hover:bg-slate-600"
+            title="Nhắc tự động mỗi ngày lúc 17:00, chỉ gửi khi có bài"
+          >
+            🔔 Nhắc ngày mai
           </button>
           <button
             onClick={() => handleOpenPreview('weekly')}
@@ -321,7 +328,7 @@ export default function MasterTimeline() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
                 <div className="font-bold text-[16px]">
-                  {previewModal.type === 'daily' ? '📅 Xem trước — Lịch hôm nay' : '📣 Xem trước — Lịch tuần'}
+                  {{ daily: '📅 Xem trước — Lịch hôm nay', weekly: '📣 Xem trước — Lịch tuần', tomorrow: '🔔 Xem trước — Nhắc ngày mai' }[previewModal.type]}
                 </div>
                 <div className="text-[12px] text-slate-400 mt-0.5">Chỉnh nội dung nếu cần, rồi bấm Gửi</div>
               </div>

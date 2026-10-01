@@ -30,7 +30,7 @@ import tournamentRoutes from './routes/tournament.js';
 import reflectionRoutes from './routes/reflections.js';
 import publicTimelineRoutes from './routes/publicTimeline.js';
 import settingsRoutes from './routes/settings.js';
-import { sendWebhookReminder, sendWeeklyWebhookReminder } from './services/seatalkReminder.js';
+import { sendWebhookReminder, sendWeeklyWebhookReminder, sendTomorrowWebhookReminder } from './services/seatalkReminder.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 import { syncPostsFromWebsite } from './services/tournamentService.js';
 import { query } from './db.js';
@@ -106,6 +106,17 @@ async function start() {
       console.log('[seatalk-weekly-cron]', result);
     } catch (e) {
       console.error('[seatalk-weekly-cron] error', e.message);
+    }
+  }, { timezone: 'Asia/Ho_Chi_Minh' });
+
+  // Heads-up at 17:00 ICT for tomorrow's posts — silent when nothing is
+  // scheduled, so it never becomes daily noise on a quiet day.
+  cron.schedule('0 17 * * *', async () => {
+    try {
+      const result = await sendTomorrowWebhookReminder();
+      console.log('[seatalk-tomorrow-cron]', result);
+    } catch (e) {
+      console.error('[seatalk-tomorrow-cron] error', e.message);
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
 
