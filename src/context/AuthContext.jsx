@@ -23,11 +23,11 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email, password, claim_code) => {
     setLoading(true);
     setError(null);
     try {
-      const { user: u, token } = await api.post('/auth/login', { email, password });
+      const { user: u, token } = await api.post('/auth/login', { email, password, claim_code });
       // The token is what proves identity to the API; the user object is only
       // for rendering, so a tampered copy of it grants nothing.
       localStorage.setItem(TOKEN_KEY, token);

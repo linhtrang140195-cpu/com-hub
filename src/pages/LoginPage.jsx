@@ -12,6 +12,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstTime, setFirstTime] = useState(false);
+  const [requiresCode, setRequiresCode] = useState(false);
+  const [claimCode, setClaimCode] = useState('');
   const [localError, setLocalError] = useState('');
   const { login, loading } = useAuth();
   const navigate = useNavigate();
@@ -25,6 +27,7 @@ export default function LoginPage() {
     try {
       const r = await api.post('/auth/needs-password', { email });
       setFirstTime(Boolean(r.first_time));
+      setRequiresCode(Boolean(r.requires_code));
     } catch { /* non-critical hint */ }
   };
 
@@ -32,7 +35,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLocalError('');
     try {
-      const user = await login(email, password);
+      const user = await login(email, password, claimCode);
       navigate(next || (user.role === 'admin' ? '/admin/timeline' : '/operator/today'));
     } catch (err) {
       setLocalError(err.message);
@@ -70,10 +73,25 @@ export default function LoginPage() {
             className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none mb-4 focus:border-[#E94560]"
           />
 
+          {requiresCode && (
+            <>
+              <label className="text-[11px] text-slate-400 font-bold tracking-wide mb-1.5 block">MÃ XÁC NHẬN</label>
+              <input
+                type="text"
+                required
+                value={claimCode}
+                onChange={e => setClaimCode(e.target.value.toUpperCase())}
+                placeholder="Mã được cấp riêng cho bạn"
+                className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none mb-4 focus:border-[#E94560] tracking-widest font-mono uppercase"
+              />
+            </>
+          )}
+
           {firstTime && (
             <div className="text-[11.5px] text-slate-500 bg-[#F6F7FB] border border-slate-200 rounded-lg px-3 py-2.5 mb-4 leading-relaxed">
-              Lần đầu đăng nhập — mật khẩu bạn nhập bây giờ sẽ được đặt cho tài khoản này.
-              Hãy làm ngay để không ai khác chiếm được.
+              {requiresCode
+                ? 'Tài khoản đang khôi phục quyền truy cập — cần cả mã xác nhận lẫn mật khẩu mới để đặt lại.'
+                : 'Lần đầu đăng nhập — mật khẩu bạn nhập bây giờ sẽ được đặt cho tài khoản này. Hãy làm ngay để không ai khác chiếm được.'}
             </div>
           )}
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const TYPE_ICON = {
   giai_dau: '🏆',
@@ -66,6 +67,16 @@ export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaig
   const navigate = useNavigate();
   const [types, setTypes] = useState([]);
   const [openGroup, setOpenGroup] = useState(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showChangePw, setShowChangePw] = useState(false);
+  const userMenuRef = useRef();
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e) => { if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [userMenuOpen]);
 
   useEffect(() => {
     api.get('/campaign-types').then(setTypes).catch(console.error);
@@ -120,15 +131,35 @@ export default function TopBar({ campaigns = [], activeCampaign, onSelectCampaig
             + Tạo campaign
           </button>
         )}
-        <div
-          className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[13px] font-bold text-white cursor-pointer"
-          style={{ background: user?.role === 'admin' ? '#C8A84B' : '#E94560' }}
-          onClick={() => { logout(); navigate('/login'); }}
-          title="Đăng xuất"
-        >
-          {user?.name?.[0] || '?'}
+        <div ref={userMenuRef} className="relative">
+          <div
+            className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[13px] font-bold text-white cursor-pointer"
+            style={{ background: user?.role === 'admin' ? '#C8A84B' : '#E94560' }}
+            onClick={() => setUserMenuOpen(v => !v)}
+            title={user?.name}
+          >
+            {user?.name?.[0] || '?'}
+          </div>
+          {userMenuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[170px] py-1 overflow-hidden">
+              <button
+                onClick={() => { setShowChangePw(true); setUserMenuOpen(false); }}
+                className="w-full text-left px-3.5 py-2 text-[12.5px] text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                🔑 Đổi mật khẩu
+              </button>
+              <button
+                onClick={() => { logout(); navigate('/login'); }}
+                className="w-full text-left px-3.5 py-2 text-[12.5px] text-[#E94560] hover:bg-red-50 cursor-pointer"
+              >
+                ↩ Đăng xuất
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
     </div>
   );
 }

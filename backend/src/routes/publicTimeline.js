@@ -1,7 +1,13 @@
 import { Router } from 'express';
+import multer from 'multer';
+import * as XLSX from 'xlsx';
 import { query, newId } from '../db.js';
 import { getIcRequestWebhook, getTeamWebhook } from '../services/settings.js';
 import { detectConflicts } from '../services/conflictDetect.js';
+import { resolveColumns, parseContentCalendar } from '../services/contentCalendarParser.js';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const MAX_PLAN_ROWS = 200;
 
 const IC_BRIEF_FORM = 'https://forms.gle/fSP29o5daJKDje2G6';
 
@@ -131,6 +137,101 @@ async function resolveCampaign(name) {
   );
   return id;
 }
+
+// POST /api/public/excel/preview — dry run, no DB write. Reuses the exact
+// same column-detection + parsing the admin upload uses, so a plan file that
+// works there works here too.
+router.post('/excel/preview', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Chưa chọn file' });
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheet = wb.Sheets['Content Calendar']
+      || wb.Sheets[wb.SheetNames.find(n => n.toLowerCase().includes('content'))]
+      || wb.Sheets[wb.SheetNames[0]];
+    if (!sheet) return res.status(400).json({ error: 'Không tìm thấy sheet dữ liệu trong file' });
+
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, header: 1 });
+    const headerRow = rows[0] || [];
+    const sampleRows = rows.slice(1, 6);
+
+    const cols = await resolveColumns(headerRow, sampleRows);
+    const posts = parseContentCalendar(rows, cols);
+    if (!posts.length) {
+      return res.status(400).json({ error: 'Không đọc được bài nào từ file — kiểm tra cột Ngày và Tên bài' });
+    }
+    if (posts.length > MAX_PLAN_ROWS) {
+      return res.status(400).json({ error: `File có ${posts.length} dòng, vượt giới hạn ${MAX_PLAN_ROWS} dòng mỗi lần tải lên` });
+    }
+    res.json({ posts, total: posts.length });
+  } catch (e) {
+    console.error('[public/excel/preview]', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/public/excel/import — commit the (already previewed) rows.
+// One campaign for the whole file, resolved/created the same way a manual
+// booking resolves a typed campaign name. Every row is tagged with the
+// submitter's identity so they can edit/delete it exactly like a hand-typed
+// slot, and with a shared series_id so the whole import can be undone in one
+// action from the delete UI ("xoá cả chuỗi").
+router.post('/excel/import', async (req, res) => {
+  const b = req.body || {};
+  if (!validKey(b.public_key)) return res.status(400).json({ error: 'Thiếu mã định danh trình duyệt' });
+
+  const email = clean(b.email, 255).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return res.status(400).json({ error: 'Điền email công ty hợp lệ' });
+  }
+
+  const posts = Array.isArray(b.posts) ? b.posts : [];
+  if (!posts.length) return res.status(400).json({ error: 'Không có bài nào để tạo' });
+  if (posts.length > MAX_PLAN_ROWS) {
+    return res.status(400).json({ error: `Tối đa ${MAX_PLAN_ROWS} dòng mỗi lần tải lên` });
+  }
+
+  const campaign_id = await resolveCampaign(clean(b.campaign, 300) || 'Chưa phân loại');
+  const post_owner = normaliseOwner(b.post_owner);
+  const series_id = newId();
+
+  const created = [];
+  for (const p of posts) {
+    const title = clean(p.title, 500);
+    const when = p.scheduled_at ? new Date(p.scheduled_at) : null;
+    if (!title || !when || isNaN(when.getTime())) continue;
+
+    const id = newId();
+    await query(
+      `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, description, channels,
+                          status, public_key, operator_email, series_id, post_owner)
+       VALUES (?,?,?,?,?,?,?,'scheduled',?,?,?,?)`,
+      [id, campaign_id, when, clean(p.post_type, 128) || 'POST', title, clean(p.description, 2000) || null,
+       JSON.stringify(Array.isArray(p.channels) ? p.channels.map(c => clean(c, 40)).filter(Boolean) : []),
+       b.public_key, email, series_id, post_owner]
+    );
+    created.push(id);
+  }
+
+  if (!created.length) return res.status(400).json({ error: 'Không có dòng nào hợp lệ để tạo (thiếu ngày hoặc tiêu đề)' });
+
+  let notified = false;
+  if (created.length) {
+    const { rows: c } = await query('SELECT name FROM campaigns WHERE id = ?', [campaign_id]);
+    try {
+      await notifyNewBooking(req, {
+        email, campaign: c[0]?.name || '—', post_type: `File kế hoạch (${created.length} bài)`,
+        title: posts[0]?.title ? `${posts[0].title}${created.length > 1 ? ` (+${created.length - 1} bài khác)` : ''}` : '—',
+        channels: [], post_owner,
+        slots: posts.map(p => p.scheduled_at ? new Date(p.scheduled_at) : null).filter(Boolean).sort((a, b) => a - b),
+      });
+      notified = true;
+    } catch (e) {
+      console.error('[booking-notify]', e.message);
+    }
+  }
+
+  res.json({ created: created.length, series_id, notified });
+});
 
 // GET /api/public/meta — campaigns + the vocabulary the form offers
 router.get('/meta', async (_req, res) => {

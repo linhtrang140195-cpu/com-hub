@@ -159,6 +159,20 @@ async function runOneOffFixes(conn) {
         "UPDATE users SET password_hash = NULL WHERE LOWER(email) = 'linhtrang.tran@garena.vn'"
       ),
     },
+    {
+      name: 'reset_locked_admin_password_20261001_take2_with_code',
+      // The first reset above got raced and reclaimed by someone else within
+      // minutes. This time the account is unlocked *and* gated behind a
+      // one-time code, shown to her directly in chat and nowhere else, so a
+      // second stranger cannot win the race again.
+      run: () => conn.query(
+        "UPDATE users SET password_hash = NULL WHERE LOWER(email) = 'linhtrang.tran@garena.vn'"
+      ).then(() => conn.query(
+        "INSERT INTO app_settings (`key`, value, updated_by) VALUES (?, ?, 'system') " +
+        "ON DUPLICATE KEY UPDATE value = VALUES(value)",
+        ['claim_code:linhtrang.tran@garena.vn', '6HJT6P']
+      )),
+    },
   ];
 
   for (const fix of fixes) {
