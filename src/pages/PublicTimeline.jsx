@@ -331,9 +331,7 @@ export default function PublicTimeline() {
               <span className="text-[10.5px] font-semibold text-[#E94560]">Email chưa đúng định dạng</span>
             )}
             {!isAdmin && (
-              <a href="/login?next=/timeline" className="text-[10.5px] text-slate-400 hover:text-[#E94560] hover:underline">
-                Là admin? Đăng nhập để sắp xếp lịch cả team ↗
-              </a>
+              <span className="text-[10.5px] text-slate-400">Điền email của bạn tại đây nha</span>
             )}
           </div>
         </div>
@@ -687,14 +685,21 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
 
 /* ── Add slot modal ──────────────────────────────────── */
 function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
-  // 'weekly' keeps the original behaviour byte-for-byte (day-of-week chips +
-  // "lặp N tuần"); 'daily' and 'monthly' are two more ways to build the same
+  // 'once' is the common case (a single, non-recurring post) and is the
+  // default so most users never touch the frequency picker at all. 'weekly'
+  // keeps the original behaviour byte-for-byte (day-of-week chips + "lặp N
+  // tuần"); 'daily' and 'monthly' are two more ways to build the same
   // dates[] the server already accepts, computed client-side.
-  const [freq, setFreq] = useState('weekly');
+  const [freq, setFreq] = useState('once');
   const [dates, setDates] = useState([dateKey]);
   const [times, setTimes] = useState(['09:00']);
   const [weeks, setWeeks] = useState(1);
   const [dailyCount, setDailyCount] = useState(7);
+  // Which weekdays count while scanning the daily range — default is every
+  // day (unchanged behaviour); deselecting e.g. Sat+Sun gives "post every
+  // weekday" without the user doing N-weeks math themselves. Values are JS
+  // getUTCDay() indices: 0=Sun..6=Sat.
+  const [dailyWeekdays, setDailyWeekdays] = useState([1, 2, 3, 4, 5, 6, 0]);
   const [monthlyCount, setMonthlyCount] = useState(3);
   // Nothing preselected: a wrong default is worse than none when the field is optional.
   const [campaign, setCampaign] = useState('');
@@ -720,10 +725,14 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
   }, [dateKey]);
 
   const effectiveDates = useMemo(() => {
-    if (freq === 'daily') return Array.from({ length: dailyCount }, (_, i) => addDaysKey(dateKey, i));
+    if (freq === 'once') return [dateKey];
+    if (freq === 'daily') {
+      return Array.from({ length: dailyCount }, (_, i) => addDaysKey(dateKey, i))
+        .filter(k => dailyWeekdays.includes(new Date(k + 'T00:00:00Z').getUTCDay()));
+    }
     if (freq === 'monthly') return Array.from({ length: monthlyCount }, (_, i) => addMonthsKey(dateKey, i));
     return dates;
-  }, [freq, dailyCount, monthlyCount, dateKey, dates]);
+  }, [freq, dailyCount, dailyWeekdays, monthlyCount, dateKey, dates]);
   const effectiveRepeatWeeks = freq === 'weekly' ? weeks : 1;
 
   const total = effectiveDates.length * times.length * effectiveRepeatWeeks;
@@ -828,8 +837,8 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
           {/* Frequency */}
           <div className="flex flex-col gap-1.5">
             <Label>Tần suất</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {[['daily', 'Hàng ngày'], ['weekly', 'Hàng tuần'], ['monthly', 'Hàng tháng']].map(([key, label]) => (
+            <div className="grid grid-cols-4 gap-2">
+              {[['once', 'Bài lẻ'], ['daily', 'Hàng ngày'], ['weekly', 'Hàng tuần'], ['monthly', 'Hàng tháng']].map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setFreq(key)}
@@ -843,6 +852,12 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
               ))}
             </div>
           </div>
+
+          {freq === 'once' && (
+            <div className="text-[12.5px] text-slate-600 bg-[#F6F7FB] border border-slate-200 rounded-lg px-3 py-2.5">
+              Đăng duy nhất 1 lần vào <b>{vnDayLabel(dateKey)}</b>.
+            </div>
+          )}
 
           {freq === 'weekly' && (
             <div className="flex flex-col gap-1.5">
@@ -858,8 +873,21 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
           )}
 
           {freq === 'daily' && (
-            <div className="text-[12.5px] text-slate-600 bg-[#F6F7FB] border border-slate-200 rounded-lg px-3 py-2.5">
-              Bắt đầu từ <b>{vnDayLabel(dateKey)}</b>, lặp mỗi ngày liên tiếp.
+            <div className="flex flex-col gap-1.5">
+              <Label>Chỉ vào các ngày — bỏ tick để nghỉ ngày đó (vd T7, CN)</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {DOW.map((label, i) => {
+                  const v = [1, 2, 3, 4, 5, 6, 0][i];
+                  return (
+                    <Chip key={v} on={dailyWeekdays.includes(v)} onClick={() => toggle(setDailyWeekdays, v)}>
+                      {label}
+                    </Chip>
+                  );
+                })}
+              </div>
+              <div className="text-[12.5px] text-slate-600 bg-[#F6F7FB] border border-slate-200 rounded-lg px-3 py-2.5">
+                Bắt đầu từ <b>{vnDayLabel(dateKey)}</b>, quét các ngày liên tiếp và chỉ giữ lại ngày khớp bộ lọc trên.
+              </div>
             </div>
           )}
 
@@ -895,9 +923,9 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Repeat count — unit and cap follow the chosen frequency */}
+          {/* Repeat count — unit and cap follow the chosen frequency; 'once' has nothing to repeat */}
           <div className="flex items-center gap-2.5 flex-wrap">
-            <Label>Lặp lại</Label>
+            {freq !== 'once' && <Label>Lặp lại</Label>}
             {freq === 'weekly' && (
               <>
                 <input
