@@ -808,7 +808,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
               >
                 <div className="flex items-center gap-1.5 text-[13px] font-bold">
                   <img src={mascotChick} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
-                  Nhờ IC đăng
+                  Request IC truyền thông
                 </div>
                 <div className={`text-[10.5px] mt-0.5 ${owner === 'ic' ? 'text-red-100' : 'text-slate-400'}`}>
                   IC team viết & đăng giúp
