@@ -6,6 +6,7 @@ import {
 } from '../utils/datetime';
 import { copyText } from '../services/clipboard';
 import ConflictAlert from '../components/shared/ConflictAlert';
+import mascotChick from '../assets/mascot-chick.webp';
 
 const DOW = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 // Brief form the requester fills in when they ask the IC team to write the post.
@@ -268,26 +269,42 @@ export default function PublicTimeline() {
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <div className={`flex items-center gap-2.5 bg-[#F6F7FB] border rounded-xl px-3 py-2 ${
-              me && !emailOk ? 'border-[#E94560]' : 'border-slate-200'
-            }`}>
-              <div
-                className="w-8 h-8 rounded-lg grid place-items-center text-white text-[12px] font-extrabold shrink-0"
-                style={{ background: emailOk ? '#E94560' : '#94A3B8' }}
-              >
-                {emailOk ? me.slice(0, 2).toUpperCase() : '?'}
-              </div>
-              <div>
-                <div className="text-[10px] font-bold tracking-wider uppercase text-slate-400">Email của bạn</div>
-                <input
-                  type="email"
-                  value={me}
-                  onChange={e => setMe(e.target.value)}
-                  onBlur={e => saveEmail(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                  placeholder="ten.ho@garena.vn"
-                  className="bg-transparent border-none outline-none text-[13px] font-semibold w-[178px] p-0"
+            <div className="flex items-center gap-2">
+              {/* Nudge: only while nobody has identified themselves yet — once
+                  an email is saved, the mascot would just be noise. */}
+              {!me && (
+                <img
+                  src={mascotChick}
+                  alt=""
+                  className="w-10 h-10 rounded-full object-cover shrink-0 animate-bounce shadow-[0_2px_8px_rgba(233,69,96,0.35)]"
+                  title="Điền email của bạn vào đây nhé!"
                 />
+              )}
+              <div className={`flex items-center gap-2.5 bg-[#F6F7FB] border-2 rounded-xl px-3 py-2 transition-shadow ${
+                me && !emailOk
+                  ? 'border-[#E94560]'
+                  : !me
+                    ? 'border-[#E94560] shadow-[0_0_0_4px_rgba(233,69,96,0.12)] animate-pulse'
+                    : 'border-slate-200'
+              }`}>
+                <div
+                  className="w-8 h-8 rounded-lg grid place-items-center text-white text-[12px] font-extrabold shrink-0"
+                  style={{ background: emailOk ? '#E94560' : '#94A3B8' }}
+                >
+                  {emailOk ? me.slice(0, 2).toUpperCase() : '?'}
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold tracking-wider uppercase text-slate-400">Email của bạn</div>
+                  <input
+                    type="email"
+                    value={me}
+                    onChange={e => setMe(e.target.value)}
+                    onBlur={e => saveEmail(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    placeholder="ten.ho@garena.vn"
+                    className="bg-transparent border-none outline-none text-[13px] font-semibold w-[178px] p-0"
+                  />
+                </div>
               </div>
             </div>
             {me && !emailOk && (
