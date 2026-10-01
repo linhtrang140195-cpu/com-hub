@@ -270,16 +270,14 @@ export default function PublicTimeline() {
           </div>
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
-              {/* Nudge: only while nobody has identified themselves yet — once
-                  an email is saved, the mascot would just be noise. */}
-              {!me && (
-                <img
-                  src={mascotChick}
-                  alt=""
-                  className="w-10 h-10 rounded-full object-cover shrink-0 animate-bounce shadow-[0_2px_8px_rgba(233,69,96,0.35)]"
-                  title="Điền email của bạn vào đây nhé!"
-                />
-              )}
+              {/* Always on — decorative as much as it is a nudge, so it stays
+                  even after the email is filled in. */}
+              <img
+                src={mascotChick}
+                alt=""
+                className="w-10 h-10 rounded-full object-cover shrink-0 animate-bounce shadow-[0_2px_8px_rgba(233,69,96,0.35)]"
+                title={me ? undefined : 'Điền email của bạn vào đây nhé!'}
+              />
               <div className={`flex items-center gap-2.5 bg-[#F6F7FB] border-2 rounded-xl px-3 py-2 transition-shadow ${
                 me && !emailOk
                   ? 'border-[#E94560]'
