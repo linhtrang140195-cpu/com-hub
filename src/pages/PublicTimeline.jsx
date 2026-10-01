@@ -526,6 +526,7 @@ export default function PublicTimeline() {
         <AddSlotModal
           dateKey={addFor}
           me={me}
+          saveEmail={saveEmail}
           publicKey={publicKey}
           meta={meta}
           onClose={() => setAddFor(null)}
@@ -684,7 +685,11 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
 }
 
 /* ── Add slot modal ──────────────────────────────────── */
-function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
+function AddSlotModal({ dateKey, me, saveEmail, publicKey, meta, onClose, onSaved }) {
+  // Local draft so the user can type their email right here, without closing
+  // the modal (which used to wipe out everything they'd filled in below).
+  const [emailDraft, setEmailDraft] = useState(me || '');
+  const emailDraftOk = EMAIL_RE.test(emailDraft.trim());
   // 'once' is the common case (a single, non-recurring post) and is the
   // default so most users never touch the frequency picker at all. 'weekly'
   // keeps the original behaviour byte-for-byte (day-of-week chips + "lặp N
@@ -745,16 +750,20 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
 
   const save = async () => {
     // Only the email is required — it is what lets you edit or cancel the slot
-    // later. Everything else can be filled in afterwards.
-    if (!EMAIL_RE.test(me.trim())) return setErr('Điền email công ty của bạn ở góc trên bên phải trước đã.');
+    // later. Everything else can be filled in afterwards. The field lives
+    // right here in the modal now, so a missing/invalid email no longer
+    // means closing out and losing everything already filled in below.
+    if (!emailDraftOk) return setErr('Điền email công ty của bạn ở trên để lưu slot nhé.');
     if (freq === 'weekly' && !dates.length) return setErr('Chọn ít nhất một ngày.');
     if (!times.length) return setErr('Chọn ít nhất một giờ.');
     setSaving(true);
     setErr('');
+    const email = emailDraft.trim().toLowerCase();
+    saveEmail(email);
     try {
       await api.post('/public/posts', {
         public_key: publicKey,
-        email: me.trim().toLowerCase(),
+        email,
         campaign: campaign.trim(),
         post_type: postType.trim() || 'POST',
         title: title.trim(),
@@ -777,12 +786,35 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100">
           <div>
             <div className="text-[16px] font-extrabold">Hôm nay bạn muốn truyền thông gì?</div>
-            <div className="text-[11.5px] text-slate-400 mt-0.5">{me || 'Chưa điền email'} · {vnDayLabel(dateKey)}</div>
+            <div className="text-[11.5px] text-slate-400 mt-0.5">{vnDayLabel(dateKey)}</div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer">✕</button>
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex flex-col gap-3.5">
+          {/* Email lives right in the modal — no more closing out (and losing
+              everything typed below) just to fill it in up in the header. */}
+          <div className="flex flex-col gap-1.5">
+            <Label>Email của bạn</Label>
+            <input
+              type="email"
+              value={emailDraft}
+              onChange={e => setEmailDraft(e.target.value)}
+              onBlur={e => saveEmail(e.target.value)}
+              placeholder="ten.ho@garena.vn"
+              className={`border-2 rounded-lg px-3 py-2 text-[13px] font-semibold outline-none transition-colors ${
+                emailDraft && !emailDraftOk
+                  ? 'border-[#E94560]'
+                  : !emailDraft
+                    ? 'border-[#E94560] bg-red-50/40'
+                    : 'border-slate-200 bg-[#F6F7FB] focus:border-[#4B6FE0]'
+              }`}
+            />
+            {emailDraft && !emailDraftOk && (
+              <span className="text-[10.5px] font-semibold text-[#E94560]">Email chưa đúng định dạng</span>
+            )}
+          </div>
+
           {/* Who publishes it — decides whether this is a request to IC or just a heads-up */}
           <div className="flex flex-col gap-1.5">
             <Label>Ai đăng bài này?</Label>
