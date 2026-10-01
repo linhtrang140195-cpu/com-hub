@@ -98,6 +98,7 @@ export default function PublicTimeline() {
   const [addFor, setAddFor] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
   const [digest, setDigest] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [editingTime, setEditingTime] = useState(null); // { id, value }
@@ -376,6 +377,12 @@ export default function PublicTimeline() {
               >
                 📋 Copy lịch tuần
               </button>
+              <button
+                onClick={() => setShowUpload(true)}
+                className="rounded-lg px-4 py-2 text-[12.5px] font-bold bg-white border border-slate-200 hover:border-slate-400 cursor-pointer"
+              >
+                📎 Tải file kế hoạch lên
+              </button>
             </div>
           )}
         </div>
@@ -531,6 +538,15 @@ export default function PublicTimeline() {
           meta={meta}
           onClose={() => setAddFor(null)}
           onSaved={() => { setAddFor(null); load(); api.get('/public/meta').then(setMeta).catch(() => {}); }}
+        />
+      )}
+      {showUpload && (
+        <UploadPlanModal
+          me={me}
+          saveEmail={saveEmail}
+          publicKey={publicKey}
+          onClose={() => setShowUpload(false)}
+          onSaved={() => { setShowUpload(false); load(); api.get('/public/meta').then(setMeta).catch(() => {}); }}
         />
       )}
       {editingPost && (
@@ -1044,6 +1060,197 @@ function AddSlotModal({ dateKey, me, saveEmail, publicKey, meta, onClose, onSave
           >
             {saving ? 'Đang lưu…' : `Lưu ${total > 1 ? `${total} slot` : 'slot'}`}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Upload a plan file ──────────────────────────────────
+   For people who already have a content calendar in Excel and don't want to
+   re-type every slot by hand. Two steps: preview (dry run, no DB write — the
+   same column-detection the admin Excel import uses) then import (commits
+   the rows the person is left with after trimming/fixing the preview table).
+   Every row always becomes post_owner: 'ic' — someone uploading a ready-made
+   plan is asking IC to schedule it, not announcing their own posts, so there
+   is no self/IC picker here like in AddSlotModal. */
+function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
+  const [emailDraft, setEmailDraft] = useState(me || '');
+  const emailDraftOk = EMAIL_RE.test(emailDraft.trim());
+  const [file, setFile] = useState(null);
+  const [campaign, setCampaign] = useState('');
+  const [posts, setPosts] = useState(null); // null until previewed
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  useEscape(onClose);
+
+  const preview = async () => {
+    if (!file) return setErr('Chọn file Excel trước đã.');
+    setLoading(true);
+    setErr('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const result = await api.postForm('/public/excel/preview', fd);
+      setPosts(result.posts);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePost = (i, field, val) =>
+    setPosts(prev => { const n = [...prev]; n[i] = { ...n[i], [field]: val }; return n; });
+  const removePost = (i) => setPosts(prev => prev.filter((_, j) => j !== i));
+
+  const save = async () => {
+    if (!emailDraftOk) return setErr('Điền email công ty của bạn ở trên để lưu nhé.');
+    if (!posts?.length) return setErr('Không có bài nào để lưu.');
+    setSaving(true);
+    setErr('');
+    const email = emailDraft.trim().toLowerCase();
+    saveEmail(email);
+    try {
+      const result = await api.post('/public/excel/import', {
+        public_key: publicKey,
+        email,
+        campaign: campaign.trim(),
+        post_owner: 'ic',
+        posts,
+      });
+      onSaved(result);
+    } catch (e) {
+      setErr(e.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] grid place-items-center p-4 z-50" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[640px] max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100">
+          <div>
+            <div className="text-[16px] font-extrabold">📎 Tải file kế hoạch lên</div>
+            <div className="text-[11.5px] text-slate-400 mt-0.5">File Excel content calendar có sẵn — khỏi điền tay từng dòng</div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer">✕</button>
+        </div>
+
+        <div className="px-5 py-4 overflow-y-auto flex flex-col gap-3.5">
+          <div className="flex flex-col gap-1.5">
+            <Label>Email của bạn</Label>
+            <input
+              type="email"
+              value={emailDraft}
+              onChange={e => setEmailDraft(e.target.value)}
+              onBlur={e => saveEmail(e.target.value)}
+              placeholder="ten.ho@garena.vn"
+              className={`border-2 rounded-lg px-3 py-2 text-[13px] font-semibold outline-none transition-colors ${
+                emailDraft && !emailDraftOk
+                  ? 'border-[#E94560]'
+                  : !emailDraft
+                    ? 'border-[#E94560] bg-red-50/40'
+                    : 'border-slate-200 bg-[#F6F7FB] focus:border-[#4B6FE0]'
+              }`}
+            />
+            {emailDraft && !emailDraftOk && (
+              <span className="text-[10.5px] font-semibold text-[#E94560]">Email chưa đúng định dạng</span>
+            )}
+          </div>
+
+          {posts === null && (
+            <>
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={e => { setFile(e.target.files[0]); setErr(''); }}
+                  className="text-[13px]"
+                />
+                <p className="text-[11.5px] text-slate-400 mt-2">
+                  Hệ thống tự nhận diện cột (Ngày, Giờ, Tiêu đề, Kênh…), sau đó cho bạn xem lại trước khi lưu.
+                  Tối đa 200 dòng mỗi lần tải lên.
+                </p>
+              </div>
+              <PickOrType
+                label="Campaign"
+                options={CAMPAIGN_GROUPS}
+                value={campaign}
+                onChange={setCampaign}
+                placeholder="Tên campaign mới"
+              />
+            </>
+          )}
+
+          {posts !== null && (
+            <>
+              <div className="flex items-center gap-3 text-[12px] text-slate-500">
+                <span className="font-bold text-slate-800">{posts.length} bài đọc được</span>
+                <button onClick={() => { setPosts(null); setFile(null); }} className="ml-auto text-[11.5px] font-semibold text-slate-500 hover:text-[#E94560] cursor-pointer">
+                  ← Đổi file khác
+                </button>
+              </div>
+              <div className="overflow-auto rounded-xl border border-slate-200" style={{ maxHeight: 320 }}>
+                <table className="w-full text-[12px] border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 sticky top-0">
+                      <th className="px-2 py-2 text-left font-semibold border-b border-slate-200">Ngày</th>
+                      <th className="px-2 py-2 text-left font-semibold border-b border-slate-200">Giờ</th>
+                      <th className="px-2 py-2 text-left font-semibold border-b border-slate-200" style={{ minWidth: 180 }}>Tiêu đề</th>
+                      <th className="px-2 py-2 text-left font-semibold border-b border-slate-200">Kênh</th>
+                      <th className="px-2 py-2 text-left font-semibold border-b border-slate-200">PIC</th>
+                      <th className="px-1 py-2 w-6 border-b border-slate-200" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {posts.map((p, i) => (
+                      <tr key={i} className="border-t border-slate-100">
+                        <td className="px-2 py-1 tabular-nums">{(p.scheduled_at || '').slice(0, 10)}</td>
+                        <td className="px-2 py-1 tabular-nums">{(p.scheduled_at || '').slice(11, 16) || '09:00'}</td>
+                        <td className="px-1 py-1">
+                          <input
+                            type="text" value={p.title}
+                            onChange={e => updatePost(i, 'title', e.target.value)}
+                            className="w-full border border-slate-200 rounded px-1.5 py-0.5 text-[12px] outline-none focus:border-[#4B6FE0]"
+                          />
+                        </td>
+                        <td className="px-2 py-1 text-slate-500">{Array.isArray(p.channels) ? p.channels.join(', ') : '—'}</td>
+                        <td className="px-2 py-1 text-slate-500">{p.pic_name || p.operator_email || '—'}</td>
+                        <td className="px-1 py-1 text-center">
+                          <button onClick={() => removePost(i)} title="Bỏ dòng này" className="text-slate-300 hover:text-[#E94560] cursor-pointer leading-none">✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {err && <div className="text-[12.5px] text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</div>}
+        </div>
+
+        <div className="flex items-center gap-2 px-5 py-4 border-t border-slate-100">
+          <button onClick={onClose} className="rounded-lg px-4 py-2.5 text-[13px] font-bold bg-slate-100 hover:bg-slate-200 cursor-pointer">Huỷ</button>
+          {posts === null ? (
+            <button
+              onClick={preview}
+              disabled={!file || loading}
+              className="flex-1 rounded-lg py-2.5 text-[13px] font-bold bg-[#14161F] text-white hover:bg-black cursor-pointer disabled:opacity-40"
+            >
+              {loading ? 'Đang đọc file...' : 'Đọc file'}
+            </button>
+          ) : (
+            <button
+              onClick={save}
+              disabled={saving || !posts.length}
+              className="flex-1 rounded-lg py-2.5 text-[13px] font-bold bg-[#14161F] text-white hover:bg-black cursor-pointer disabled:opacity-40"
+            >
+              {saving ? 'Đang lưu…' : `✅ Lưu ${posts.length} bài`}
+            </button>
+          )}
         </div>
       </div>
     </div>
