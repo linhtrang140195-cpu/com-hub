@@ -838,7 +838,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
           <div className="flex flex-col gap-1.5">
             <Label>Tần suất</Label>
             <div className="grid grid-cols-4 gap-2">
-              {[['once', 'Bài lẻ'], ['daily', 'Hàng ngày'], ['weekly', 'Hàng tuần'], ['monthly', 'Hàng tháng']].map(([key, label]) => (
+              {[['once', 'Hôm nay'], ['daily', 'Hàng ngày'], ['weekly', 'Hàng tuần'], ['monthly', 'Hàng tháng']].map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setFreq(key)}
