@@ -806,7 +806,10 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
                   owner === 'ic' ? 'border-[#E94560] bg-[#E94560] text-white' : 'border-slate-200 bg-[#F6F7FB] hover:border-slate-400'
                 }`}
               >
-                <div className="text-[13px] font-bold">✍️ Nhờ IC đăng</div>
+                <div className="flex items-center gap-1.5 text-[13px] font-bold">
+                  <img src={mascotChick} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                  Nhờ IC đăng
+                </div>
                 <div className={`text-[10.5px] mt-0.5 ${owner === 'ic' ? 'text-red-100' : 'text-slate-400'}`}>
                   IC team viết & đăng giúp
                 </div>
