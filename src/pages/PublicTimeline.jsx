@@ -73,6 +73,7 @@ export default function PublicTimeline() {
   const [meta, setMeta] = useState({ campaigns: [], post_types: [], channels: FALLBACK_CHANNELS });
   const [tab, setTab] = useState('week');
   const [addFor, setAddFor] = useState(null);
+  const [editingPost, setEditingPost] = useState(null);
   const [digest, setDigest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -390,6 +391,7 @@ export default function PublicTimeline() {
                                   onTimeSave={() => handleTimeSave(p)}
                                   onDelete={() => handleDelete(p)}
                                   onTogglePosted={() => handleTogglePosted(p)}
+                                  onEdit={() => setEditingPost(p)}
                                 />
                               ))}
                               {!postsForDay(day).length && (
@@ -457,13 +459,26 @@ export default function PublicTimeline() {
           onSaved={() => { setAddFor(null); load(); api.get('/public/meta').then(setMeta).catch(() => {}); }}
         />
       )}
+      {editingPost && (
+        <PostDetailModal
+          post={editingPost}
+          canEdit={isAdmin ||
+            editingPost.public_key === publicKey ||
+            Boolean(emailOk && editingPost.operator_email && editingPost.operator_email.toLowerCase() === me.toLowerCase())}
+          publicKey={publicKey}
+          email={me}
+          meta={meta}
+          onClose={() => setEditingPost(null)}
+          onSaved={() => { setEditingPost(null); load(); api.get('/public/meta').then(setMeta).catch(() => {}); }}
+        />
+      )}
       {digest && <DigestModal {...digest} onClose={() => setDigest(null)} />}
     </div>
   );
 }
 
 /* ── Slot card ───────────────────────────────────────── */
-function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTime, onTimeSave, onDelete, onTogglePosted }) {
+function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTime, onTimeSave, onDelete, onTogglePosted, onEdit }) {
   const posted = p.status === 'posted';
   const canEdit = mine || isAdmin;
   const isIC = p.post_owner === 'ic';
@@ -475,9 +490,15 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
       ? 'bg-amber-50 border-amber-300'
       : 'bg-white border-slate-200 hover:border-slate-300';
 
+  // The whole card opens the full detail view; the inline controls inside it
+  // (time editor, quick-action icons) stop the click from bubbling there, so
+  // they still work as fast one-tap actions without also popping the modal.
+  const stop = (fn) => (e) => { e.stopPropagation(); fn?.(e); };
+
   return (
     <div
-      className={`group relative rounded-lg border p-2 pl-2.5 ${shell}`}
+      onClick={onEdit}
+      className={`group relative rounded-lg border p-2 pl-2.5 cursor-pointer ${shell}`}
       style={{ borderLeft: `3px solid ${p.campaign_color || '#CBD5E1'}` }}
     >
       <div className="flex items-center gap-1.5 mb-1">
@@ -485,6 +506,7 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
           <input
             type="time"
             value={editingTime.value}
+            onClick={e => e.stopPropagation()}
             onChange={e => setEditingTime(t => ({ ...t, value: e.target.value }))}
             onKeyDown={e => { if (e.key === 'Enter') onTimeSave(); if (e.key === 'Escape') setEditingTime(null); }}
             autoFocus
@@ -492,7 +514,7 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
           />
         ) : canEdit ? (
           <button
-            onClick={() => setEditingTime({ id: p.id, value: formatTimeVN(p.scheduled_at) })}
+            onClick={stop(() => setEditingTime({ id: p.id, value: formatTimeVN(p.scheduled_at) }))}
             title="Đổi giờ đăng"
             className="text-[12px] font-extrabold tabular-nums hover:text-[#4B6FE0] hover:underline cursor-pointer"
           >
@@ -502,7 +524,7 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
           <span className="text-[12px] font-extrabold tabular-nums">{formatTimeVN(p.scheduled_at)}</span>
         )}
         {editing && (
-          <button onClick={onTimeSave} className="text-[11px] font-bold text-emerald-600 leading-none px-1 cursor-pointer">✓</button>
+          <button onClick={stop(onTimeSave)} className="text-[11px] font-bold text-emerald-600 leading-none px-1 cursor-pointer">✓</button>
         )}
         {/* Only slots booked through this board carry an owner. Posts planned in
             Comms Hub have none, and labelling those "tự đăng" would be wrong. */}
@@ -540,14 +562,14 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
         {canEdit && !editing && (
           <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
-              onClick={onTogglePosted}
+              onClick={stop(onTogglePosted)}
               title={posted ? 'Bỏ đánh dấu đã đăng' : 'Đánh dấu đã đăng'}
               className="text-[11px] leading-none px-1 py-0.5 rounded hover:bg-emerald-100 text-emerald-600 cursor-pointer"
             >
               {posted ? '↩' : '✓'}
             </button>
             <button
-              onClick={onDelete}
+              onClick={stop(onDelete)}
               title="Xoá slot"
               className="text-[12px] leading-none px-1 py-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-[#E94560] cursor-pointer"
             >
@@ -809,6 +831,203 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
           >
             {saving ? 'Đang lưu…' : `Lưu ${total > 1 ? `${total} slot` : 'slot'}`}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Post detail / edit modal ───────────────────────────
+   Opened by clicking anywhere on a card. Shows every field the public API
+   returns; whoever cannot edit this slot (not theirs, not admin) sees the
+   same layout read-only rather than a stripped-down view, so "click to see
+   more" always works the same way. */
+function PostDetailModal({ post, canEdit, publicKey, email, meta, onClose, onSaved }) {
+  const [date, setDate] = useState(toDateInputValue(post.scheduled_at));
+  const [time, setTime] = useState(formatTimeVN(post.scheduled_at));
+  const [campaign, setCampaign] = useState(post.campaign_name || '');
+  const [postType, setPostType] = useState(post.post_type || '');
+  const [title, setTitle] = useState(post.title || '');
+  const [channels, setChannels] = useState(post.channels || []);
+  const [liveLink, setLiveLink] = useState(post.live_link || '');
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  useEscape(onClose);
+
+  const chanOptions = useMemo(() => {
+    const base = meta.channels?.length ? meta.channels : FALLBACK_CHANNELS;
+    return [...new Set([...base, ...channels])];
+  }, [meta.channels, channels]);
+
+  const toggle = (set, v) =>
+    set(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
+
+  const save = async () => {
+    setSaving(true);
+    setErr('');
+    try {
+      await api.patch(`/public/posts/${post.id}`, {
+        public_key: publicKey,
+        email,
+        scheduled_at: `${date}T${time}:00+07:00`,
+        title: title.trim() || '(Chưa đặt tên)',
+        post_type: postType.trim() || 'POST',
+        campaign: campaign.trim() || undefined,
+        channels,
+        live_link: liveLink.trim(),
+      });
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+      setSaving(false);
+    }
+  };
+
+  const isIC = post.post_owner === 'ic';
+  const hasMetrics = post.status === 'posted' && (post.st_seen || post.st_react || post.web_views);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] grid place-items-center p-4 z-50" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100">
+          <div>
+            <div className="text-[16px] font-extrabold">{canEdit ? 'Sửa bài' : 'Chi tiết bài'}</div>
+            <div className="text-[11.5px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span>{post.submitted_by || post.operator_email || '—'}</span>
+              {post.post_owner && (
+                <span className={`text-[9px] font-extrabold uppercase rounded px-1.5 py-px ${isIC ? 'bg-[#E94560] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                  {isIC ? 'IC đăng' : 'Tự đăng'}
+                </span>
+              )}
+              {!post.post_owner && (
+                <span className="text-[9px] font-extrabold uppercase rounded px-1.5 py-px bg-indigo-50 text-indigo-600">Kế hoạch</span>
+              )}
+              {post.status === 'posted' && (
+                <span className="text-[9px] font-extrabold uppercase rounded px-1.5 py-px bg-emerald-50 text-emerald-700">✓ Đã đăng</span>
+              )}
+              {post.series_id && (
+                <span className="text-[9px] font-extrabold uppercase rounded px-1.5 py-px bg-slate-100 text-slate-500" title="Một phần của chuỗi lặp — xoá bài để chọn xoá cả chuỗi">
+                  Thuộc chuỗi
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer shrink-0">✕</button>
+        </div>
+
+        <div className="px-5 py-4 overflow-y-auto flex flex-col gap-3.5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Ngày đăng</Label>
+              <input
+                type="date" value={date} disabled={!canEdit}
+                onChange={e => setDate(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13.5px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Giờ đăng</Label>
+              <input
+                type="time" value={time} disabled={!canEdit}
+                onChange={e => setTime(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13.5px] tabular-nums outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          {canEdit ? (
+            <>
+              <PickOrType label="Campaign" options={CAMPAIGN_GROUPS} value={campaign} onChange={setCampaign} placeholder="Tên campaign mới" />
+              <PickOrType label="Loại bài" options={POST_TYPES} value={postType} onChange={setPostType} placeholder="Loại bài khác" />
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Campaign</Label>
+                <div className="text-[13.5px] font-semibold mt-1">{post.campaign_name || '—'}</div>
+              </div>
+              <div>
+                <Label>Loại bài</Label>
+                <div className="text-[13.5px] font-semibold mt-1">{post.post_type || '—'}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Tiêu đề bài</Label>
+            {canEdit ? (
+              <textarea
+                value={title} onChange={e => setTitle(e.target.value)} rows={2}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13.5px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white resize-y leading-relaxed"
+              />
+            ) : (
+              <div className="text-[13.5px] leading-relaxed">{post.title}</div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Kênh đăng</Label>
+            {canEdit ? (
+              <div className="flex flex-wrap gap-1.5">
+                {chanOptions.map(ch => (
+                  <Chip key={ch} on={channels.includes(ch)} onClick={() => toggle(setChannels, ch)}>{ch}</Chip>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {(post.channels || []).map(ch => (
+                  <span key={ch} className="text-[11px] font-semibold text-slate-600 bg-slate-100 rounded px-2 py-1">{ch}</span>
+                ))}
+                {!post.channels?.length && <span className="text-[12px] text-slate-400">—</span>}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Link bài đã đăng <span className="normal-case tracking-normal text-slate-300 font-semibold">· không bắt buộc</span></Label>
+            {canEdit ? (
+              <input
+                type="url" value={liveLink} onChange={e => setLiveLink(e.target.value)}
+                placeholder="Dán link sau khi đã đăng — để đối chiếu số liệu"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-[#4B6FE0] bg-[#F6F7FB] focus:bg-white"
+              />
+            ) : post.live_link ? (
+              <a href={post.live_link} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#4B6FE0] underline break-all">{post.live_link}</a>
+            ) : (
+              <div className="text-[12px] text-slate-400">Chưa có link</div>
+            )}
+          </div>
+
+          {hasMetrics && (
+            <div className="flex items-center gap-4 rounded-lg bg-emerald-50 border border-emerald-100 px-3.5 py-2.5 text-[12px] text-emerald-800">
+              <span>👁 {post.st_seen || 0} seen</span>
+              <span>💬 {post.st_react || 0} react</span>
+              <span>🌐 {post.web_views || 0} views</span>
+            </div>
+          )}
+
+          {!canEdit && (
+            <div className="text-[11.5px] text-slate-400 bg-[#F6F7FB] rounded-lg px-3 py-2.5 leading-relaxed">
+              Chỉ người đặt slot này (hoặc admin) mới sửa được — bạn đang xem ở chế độ chỉ đọc.
+            </div>
+          )}
+
+          {err && <div className="text-[12px] font-semibold text-[#E94560] bg-red-50 rounded-lg px-3 py-2">{err}</div>}
+        </div>
+
+        <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-slate-100 bg-[#F6F7FB]">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-[13px] font-semibold text-slate-500 border border-slate-200 bg-white hover:border-slate-400 cursor-pointer">
+            {canEdit ? 'Huỷ' : 'Đóng'}
+          </button>
+          {canEdit && (
+            <button
+              onClick={save}
+              disabled={saving}
+              className="rounded-lg px-5 py-2 text-[13px] font-bold text-white bg-[#14161F] hover:bg-[#2A2D3A] disabled:opacity-50 cursor-pointer"
+            >
+              {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+            </button>
+          )}
         </div>
       </div>
     </div>

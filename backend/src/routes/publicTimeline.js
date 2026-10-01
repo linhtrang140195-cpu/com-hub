@@ -397,6 +397,11 @@ router.patch('/posts/:id', async (req, res) => {
   if (b.scheduled_at) { sets.push('scheduled_at = ?'); params.push(new Date(b.scheduled_at)); }
   if (b.title)        { sets.push('title = ?');        params.push(clean(b.title, 500)); }
   if (b.post_type)    { sets.push('post_type = ?');    params.push(clean(b.post_type, 128)); }
+  if (typeof b.campaign === 'string' && b.campaign.trim()) {
+    const campaign_id = await resolveCampaign(b.campaign);
+    sets.push('campaign_id = ?');
+    params.push(campaign_id);
+  }
   if (Array.isArray(b.channels)) {
     sets.push('channels = ?');
     params.push(JSON.stringify(b.channels.map(c => clean(c, 40)).filter(Boolean)));
