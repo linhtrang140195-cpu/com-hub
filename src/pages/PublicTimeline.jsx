@@ -57,6 +57,28 @@ function vnDayLabel(key) {
   return (dow === 0 ? 'Chủ nhật' : `Thứ ${dow + 1}`) + `, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
 }
 
+// Date math for the "Hàng ngày / Hàng tháng" recurrence modes — both expand
+// to a plain list of "YYYY-MM-DD" dates client-side, so the backend keeps
+// taking exactly the dates[]/times[]/repeat_weeks[] shape it already does
+// for "Hàng tuần" (repeat_weeks just stays 1 for these two).
+function addDaysKey(dateKey, n) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
+function addMonthsKey(dateKey, n) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const total = (m - 1) + n;
+  const year = y + Math.floor(total / 12);
+  const month = ((total % 12) + 12) % 12;
+  // Clamp to the target month's last day (e.g. "ngày 31" in a 30-day month).
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const dt = new Date(Date.UTC(year, month, Math.min(d, lastDay)));
+  return dt.toISOString().slice(0, 10);
+}
+
 function useEscape(onEscape) {
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') onEscape(); };
@@ -665,9 +687,15 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
 
 /* ── Add slot modal ──────────────────────────────────── */
 function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
+  // 'weekly' keeps the original behaviour byte-for-byte (day-of-week chips +
+  // "lặp N tuần"); 'daily' and 'monthly' are two more ways to build the same
+  // dates[] the server already accepts, computed client-side.
+  const [freq, setFreq] = useState('weekly');
   const [dates, setDates] = useState([dateKey]);
   const [times, setTimes] = useState(['09:00']);
   const [weeks, setWeeks] = useState(1);
+  const [dailyCount, setDailyCount] = useState(7);
+  const [monthlyCount, setMonthlyCount] = useState(3);
   // Nothing preselected: a wrong default is worse than none when the field is optional.
   const [campaign, setCampaign] = useState('');
   const [postType, setPostType] = useState('');
@@ -691,7 +719,14 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
     });
   }, [dateKey]);
 
-  const total = dates.length * times.length * weeks;
+  const effectiveDates = useMemo(() => {
+    if (freq === 'daily') return Array.from({ length: dailyCount }, (_, i) => addDaysKey(dateKey, i));
+    if (freq === 'monthly') return Array.from({ length: monthlyCount }, (_, i) => addMonthsKey(dateKey, i));
+    return dates;
+  }, [freq, dailyCount, monthlyCount, dateKey, dates]);
+  const effectiveRepeatWeeks = freq === 'weekly' ? weeks : 1;
+
+  const total = effectiveDates.length * times.length * effectiveRepeatWeeks;
   const chanOptions = meta.channels?.length ? meta.channels : FALLBACK_CHANNELS;
 
   // Functional update — two chips clicked in quick succession must not read
@@ -703,7 +738,7 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
     // Only the email is required — it is what lets you edit or cancel the slot
     // later. Everything else can be filled in afterwards.
     if (!EMAIL_RE.test(me.trim())) return setErr('Điền email công ty của bạn ở góc trên bên phải trước đã.');
-    if (!dates.length) return setErr('Chọn ít nhất một ngày.');
+    if (freq === 'weekly' && !dates.length) return setErr('Chọn ít nhất một ngày.');
     if (!times.length) return setErr('Chọn ít nhất một giờ.');
     setSaving(true);
     setErr('');
@@ -715,9 +750,9 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
         post_type: postType.trim() || 'POST',
         title: title.trim(),
         channels,
-        dates,
+        dates: effectiveDates,
         times,
-        repeat_weeks: weeks,
+        repeat_weeks: effectiveRepeatWeeks,
         post_owner: owner,
       });
       onSaved();
@@ -790,17 +825,49 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
             </div>
           )}
 
-          {/* Days */}
+          {/* Frequency */}
           <div className="flex flex-col gap-1.5">
-            <Label>Ngày đăng — chọn nhiều ngày nếu bài lặp</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {weekDays.map((k, i) => (
-                <Chip key={k} on={dates.includes(k)} onClick={() => toggle(setDates, k)}>
-                  {DOW[i]} {k.slice(8)}/{k.slice(5, 7)}
-                </Chip>
+            <Label>Tần suất</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {[['daily', 'Hàng ngày'], ['weekly', 'Hàng tuần'], ['monthly', 'Hàng tháng']].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setFreq(key)}
+                  aria-pressed={freq === key}
+                  className={`rounded-lg border px-3 py-2 text-[13px] font-bold cursor-pointer transition-colors ${
+                    freq === key ? 'border-[#14161F] bg-[#14161F] text-white' : 'border-slate-200 bg-[#F6F7FB] hover:border-slate-400'
+                  }`}
+                >
+                  {label}
+                </button>
               ))}
             </div>
           </div>
+
+          {freq === 'weekly' && (
+            <div className="flex flex-col gap-1.5">
+              <Label>Ngày đăng — chọn nhiều ngày nếu bài lặp</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {weekDays.map((k, i) => (
+                  <Chip key={k} on={dates.includes(k)} onClick={() => toggle(setDates, k)}>
+                    {DOW[i]} {k.slice(8)}/{k.slice(5, 7)}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {freq === 'daily' && (
+            <div className="text-[12.5px] text-slate-600 bg-[#F6F7FB] border border-slate-200 rounded-lg px-3 py-2.5">
+              Bắt đầu từ <b>{vnDayLabel(dateKey)}</b>, lặp mỗi ngày liên tiếp.
+            </div>
+          )}
+
+          {freq === 'monthly' && (
+            <div className="text-[12.5px] text-slate-600 bg-[#F6F7FB] border border-slate-200 rounded-lg px-3 py-2.5">
+              Vào ngày <b>{dateKey.slice(8)}</b> hằng tháng, bắt đầu từ <b>{vnDayLabel(dateKey)}</b>.
+            </div>
+          )}
 
           {/* Times */}
           <div className="flex flex-col gap-1.5">
@@ -828,15 +895,39 @@ function AddSlotModal({ dateKey, me, publicKey, meta, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Repeat */}
+          {/* Repeat count — unit and cap follow the chosen frequency */}
           <div className="flex items-center gap-2.5 flex-wrap">
             <Label>Lặp lại</Label>
-            <input
-              type="number" min="1" max="26" value={weeks}
-              onChange={e => setWeeks(Math.min(Math.max(Number(e.target.value) || 1, 1), 26))}
-              className="w-[64px] border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold tabular-nums outline-none focus:border-[#4B6FE0]"
-            />
-            <span className="text-[12.5px] text-slate-500">tuần</span>
+            {freq === 'weekly' && (
+              <>
+                <input
+                  type="number" min="1" max="26" value={weeks}
+                  onChange={e => setWeeks(Math.min(Math.max(Number(e.target.value) || 1, 1), 26))}
+                  className="w-[64px] border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold tabular-nums outline-none focus:border-[#4B6FE0]"
+                />
+                <span className="text-[12.5px] text-slate-500">tuần</span>
+              </>
+            )}
+            {freq === 'daily' && (
+              <>
+                <input
+                  type="number" min="1" max="90" value={dailyCount}
+                  onChange={e => setDailyCount(Math.min(Math.max(Number(e.target.value) || 1, 1), 90))}
+                  className="w-[64px] border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold tabular-nums outline-none focus:border-[#4B6FE0]"
+                />
+                <span className="text-[12.5px] text-slate-500">ngày liên tiếp</span>
+              </>
+            )}
+            {freq === 'monthly' && (
+              <>
+                <input
+                  type="number" min="1" max="24" value={monthlyCount}
+                  onChange={e => setMonthlyCount(Math.min(Math.max(Number(e.target.value) || 1, 1), 24))}
+                  className="w-[64px] border border-slate-200 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold tabular-nums outline-none focus:border-[#4B6FE0]"
+                />
+                <span className="text-[12.5px] text-slate-500">tháng</span>
+              </>
+            )}
             <span className={`ml-auto text-[12px] font-bold px-2.5 py-1 rounded-lg ${total > 60 ? 'bg-red-50 text-[#E94560]' : 'bg-emerald-50 text-emerald-700'}`}>
               → Sẽ tạo {total} slot
             </span>
