@@ -150,6 +150,30 @@ export default function PublicTimeline() {
     } catch (e) { alert(e.message); }
   };
 
+  // Drag-and-drop a card onto another day: keep its time-of-day, move the
+  // date. Same ownership rule as every other edit here — the server is the
+  // real gate (ownsRow), this just avoids an optimistic move that would get
+  // rejected for someone who can't edit the slot.
+  const [dragOverDay, setDragOverDay] = useState(null);
+  const handleDropOnDay = async (p, dayKey) => {
+    setDragOverDay(null);
+    const current = toDateInputValue(p.scheduled_at);
+    if (current === dayKey) return;
+    const time = formatTimeVN(p.scheduled_at);
+    const prevScheduledAt = p.scheduled_at;
+    const when = `${dayKey}T${time}:00+07:00`;
+    // Optimistic move so the card jumps immediately; reload() below
+    // reconciles with the server (and reverts silently if it was refused).
+    setPosts(prev => prev.map(x => x.id === p.id ? { ...x, scheduled_at: when } : x));
+    try {
+      await api.patch(`/public/posts/${p.id}`, { public_key: publicKey, email: me, scheduled_at: when });
+      load();
+    } catch (e) {
+      setPosts(prev => prev.map(x => x.id === p.id ? { ...x, scheduled_at: prevScheduledAt } : x));
+      alert(e.message);
+    }
+  };
+
   const handleTogglePosted = async (p) => {
     try {
       await api.patch(`/public/posts/${p.id}`, {
@@ -374,8 +398,22 @@ export default function PublicTimeline() {
                     <div className="grid grid-cols-7 min-h-[320px]">
                       {days.map((day, i) => {
                         const isT = isSameDayVN(day, new Date());
+                        const dayKey = toDateInputValue(day);
                         return (
-                          <div key={i} className={`border-r border-slate-100 last:border-r-0 flex flex-col p-2 ${isT ? 'bg-[#EEF3FF]/40' : ''}`}>
+                          <div
+                            key={i}
+                            onDragOver={e => { e.preventDefault(); setDragOverDay(dayKey); }}
+                            onDragLeave={() => setDragOverDay(d => (d === dayKey ? null : d))}
+                            onDrop={e => {
+                              e.preventDefault();
+                              const id = e.dataTransfer.getData('text/plain');
+                              const dragged = posts.find(x => x.id === id);
+                              if (dragged) handleDropOnDay(dragged, dayKey);
+                            }}
+                            className={`border-r border-slate-100 last:border-r-0 flex flex-col p-2 transition-colors ${
+                              dragOverDay === dayKey ? 'bg-[#4B6FE0]/10 ring-2 ring-inset ring-[#4B6FE0]' : isT ? 'bg-[#EEF3FF]/40' : ''
+                            }`}
+                          >
                             <div className="flex-1 flex flex-col gap-1.5">
                               {postsForDay(day).map(p => (
                                 <SlotCard
@@ -498,7 +536,13 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
   return (
     <div
       onClick={onEdit}
-      className={`group relative rounded-lg border p-2 pl-2.5 cursor-pointer ${shell}`}
+      draggable={canEdit}
+      onDragStart={canEdit ? (e) => {
+        e.dataTransfer.setData('text/plain', p.id);
+        e.dataTransfer.effectAllowed = 'move';
+      } : undefined}
+      title={canEdit ? 'Kéo sang ngày khác để đổi lịch · bấm để xem chi tiết' : undefined}
+      className={`group relative rounded-lg border p-2 pl-2.5 cursor-pointer ${canEdit ? 'active:cursor-grabbing' : ''} ${shell}`}
       style={{ borderLeft: `3px solid ${p.campaign_color || '#CBD5E1'}` }}
     >
       <div className="flex items-center gap-1.5 mb-1">
