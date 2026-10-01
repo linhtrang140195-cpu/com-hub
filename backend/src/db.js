@@ -132,8 +132,44 @@ async function runMigrations() {
         if (e.code !== 'ER_DUP_FIELDNAME' && e.code !== 'ER_DUP_KEYNAME') throw e;
       }
     }
+    await runOneOffFixes(conn);
   } finally {
     conn.release();
+  }
+}
+
+// One-off account/data fixes that must run exactly once, ever — never on
+// every restart. Unlike the ADD COLUMN migrations above (safe to retry
+// because re-adding an existing column just errors and is skipped), these
+// touch a value real usage keeps changing: guarding with "only if still
+// unset" would undo it again the moment someone sets it, on the very next
+// restart. The app_settings marker is the only thing that makes a fix here
+// truly one-shot regardless of what the data looks like afterward.
+async function runOneOffFixes(conn) {
+  const fixes = [
+    {
+      name: 'reset_locked_admin_password_20261001',
+      // linhtrang.tran got locked out of her own admin account — someone
+      // else's login attempt (or a forgotten password) had already claimed
+      // the password-on-first-login slot. This clears it back to unclaimed
+      // so she can set a fresh one the next time she signs in, same as the
+      // original first-login flow. It must never re-fire after that, or her
+      // new password would be wiped on the next deploy/restart.
+      run: () => conn.query(
+        "UPDATE users SET password_hash = NULL WHERE LOWER(email) = 'linhtrang.tran@garena.vn'"
+      ),
+    },
+  ];
+
+  for (const fix of fixes) {
+    const [rows] = await conn.query('SELECT 1 FROM app_settings WHERE `key` = ?', [`onceoff_${fix.name}`]);
+    if (rows.length) continue; // already ran, ever — never touch this account again
+    await fix.run();
+    await conn.query(
+      'INSERT INTO app_settings (`key`, value, updated_by) VALUES (?, ?, ?)',
+      [`onceoff_${fix.name}`, 'done', 'system']
+    );
+    console.log(`[db] One-off fix applied: ${fix.name}`);
   }
 }
 
