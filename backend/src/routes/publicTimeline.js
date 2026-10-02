@@ -187,10 +187,20 @@ router.post('/excel/preview', upload.single('file'), async (req, res) => {
     const rows = rowsForSheet(selected);
     const headerRow = rows[0] || [];
     const sampleRows = rows.slice(1, 6);
-
-    const cols = await resolveColumns(headerRow, sampleRows);
-    const posts = parseContentCalendar(rows, cols);
     const sheetInfo = { sheets: sheetNames, selected_sheet: sheetNames[selected] };
+
+    // Column detection fails outright (not just "0 posts") when the sheet's
+    // first row doesn't look like a header at all — the realistic case for a
+    // cover/notes sheet that happened to be picked by the name heuristic.
+    // Same deal as the 0-posts case below: still return `sheetInfo` or the
+    // picker never gets a chance to offer the sheet that actually has data.
+    let cols;
+    try {
+      cols = await resolveColumns(headerRow, sampleRows);
+    } catch (e) {
+      return res.status(400).json({ error: e.message, ...sheetInfo });
+    }
+    const posts = parseContentCalendar(rows, cols);
     if (!posts.length) {
       return res.status(400).json({
         error: `Không đọc được bài nào từ "${sheetNames[selected]}" — kiểm tra cột Ngày và Tên bài${sheetNames.length > 1 ? ', hoặc thử sheet/bảng khác' : ''}`,

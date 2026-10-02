@@ -377,12 +377,18 @@ export default function PublicTimeline() {
               >
                 📋 Copy lịch tuần
               </button>
-              <button
-                onClick={() => setShowUpload(true)}
-                className="rounded-lg px-4 py-2 text-[12.5px] font-bold bg-white border border-slate-200 hover:border-slate-400 cursor-pointer"
-              >
-                📎 Tải file kế hoạch lên
-              </button>
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={() => setShowUpload(true)}
+                  className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12.5px] font-bold bg-white border border-slate-200 hover:border-slate-400 cursor-pointer"
+                >
+                  <img src={mascotChick} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                  Tải file kế hoạch lên
+                </button>
+                <span className="text-[10.5px] italic text-slate-400 px-0.5">
+                  (Có sẵn plan timeline? Tải lên để đỡ phải nhập tay từng dòng)
+                </span>
+              </div>
             </div>
           )}
         </div>
