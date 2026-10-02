@@ -1080,18 +1080,43 @@ function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
   const [file, setFile] = useState(null);
   const [campaign, setCampaign] = useState('');
   const [posts, setPosts] = useState(null); // null until previewed
+  const [sheets, setSheets] = useState([]); // every sheet/table found in the file
+  const [sheetChoice, setSheetChoice] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   useEscape(onClose);
 
   const preview = async () => {
-    if (!file) return setErr('Chọn file Excel trước đã.');
+    if (!file) return setErr('Chọn file trước đã.');
     setLoading(true);
     setErr('');
     try {
       const fd = new FormData();
       fd.append('file', file);
+      if (sheetChoice) fd.append('sheet', sheetChoice);
+      const result = await api.postForm('/public/excel/preview', fd);
+      setPosts(result.posts);
+      setSheets(result.sheets || []);
+      setSheetChoice(result.selected_sheet || '');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Re-reads the SAME file against a different sheet/table — no need to
+  // re-pick it from disk. Clears the edited preview table since it belonged
+  // to the sheet being left.
+  const switchSheet = async (name) => {
+    setSheetChoice(name);
+    setLoading(true);
+    setErr('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('sheet', name);
       const result = await api.postForm('/public/excel/preview', fd);
       setPosts(result.posts);
     } catch (e) {
@@ -1165,13 +1190,14 @@ function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
               <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
                 <input
                   type="file"
-                  accept=".xlsx,.xls"
-                  onChange={e => { setFile(e.target.files[0]); setErr(''); }}
+                  accept=".xlsx,.xls,.docx"
+                  onChange={e => { setFile(e.target.files[0]); setErr(''); setSheets([]); setSheetChoice(''); }}
                   className="text-[13px]"
                 />
                 <p className="text-[11.5px] text-slate-400 mt-2">
-                  Hệ thống tự nhận diện cột (Ngày, Giờ, Tiêu đề, Kênh…), sau đó cho bạn xem lại trước khi lưu.
-                  Tối đa 200 dòng mỗi lần tải lên.
+                  Nhận file Excel (.xlsx) hoặc Word (.docx, plan trình bày dạng bảng). Hệ thống tự nhận diện cột
+                  (Ngày, Giờ, Tiêu đề, Kênh…), sau đó cho bạn xem lại trước khi lưu. File nhiều sheet/bảng thì
+                  chọn đúng cái cần ở bước sau. Tối đa 200 dòng mỗi lần tải lên.
                 </p>
               </div>
               <PickOrType
@@ -1188,10 +1214,22 @@ function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
             <>
               <div className="flex items-center gap-3 text-[12px] text-slate-500">
                 <span className="font-bold text-slate-800">{posts.length} bài đọc được</span>
-                <button onClick={() => { setPosts(null); setFile(null); }} className="ml-auto text-[11.5px] font-semibold text-slate-500 hover:text-[#E94560] cursor-pointer">
+                <button onClick={() => { setPosts(null); setFile(null); setSheets([]); setSheetChoice(''); }} className="ml-auto text-[11.5px] font-semibold text-slate-500 hover:text-[#E94560] cursor-pointer">
                   ← Đổi file khác
                 </button>
               </div>
+              {sheets.length > 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>File này có {sheets.length} sheet/bảng — đang đọc từ:</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sheets.map(name => (
+                      <Chip key={name} on={name === sheetChoice} onClick={() => switchSheet(name)}>
+                        {name}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="overflow-auto rounded-xl border border-slate-200" style={{ maxHeight: 320 }}>
                 <table className="w-full text-[12px] border-collapse">
                   <thead>

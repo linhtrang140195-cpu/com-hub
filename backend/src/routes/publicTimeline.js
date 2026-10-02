@@ -5,6 +5,7 @@ import { query, newId } from '../db.js';
 import { getIcRequestWebhook, getTeamWebhook } from '../services/settings.js';
 import { detectConflicts } from '../services/conflictDetect.js';
 import { resolveColumns, parseContentCalendar } from '../services/contentCalendarParser.js';
+import { extractTablesFromDocx } from '../services/docTableExtractor.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 const MAX_PLAN_ROWS = 200;
@@ -140,29 +141,66 @@ async function resolveCampaign(name) {
 
 // POST /api/public/excel/preview — dry run, no DB write. Reuses the exact
 // same column-detection + parsing the admin upload uses, so a plan file that
-// works there works here too.
+// works there works here too. Accepts .xlsx/.xls (one sheet per workbook) and
+// .docx (one "sheet" per table found in the document) — either way the result
+// is normalised to the same rows[][] shape before parsing.
+//
+// A file may hold more than one usable sheet/table. Silently guessing which
+// one is "the real plan" risks losing whichever one wasn't picked without the
+// person noticing, so every source is listed back (`sheets`) and the caller
+// can re-request a specific one by name via the `sheet` field — the first
+// preview (no `sheet` given) still falls back to the old heuristic (a sheet
+// literally named "Content Calendar", then anything with "content" in the
+// name, then just the first one) so nothing changes for a single-sheet file.
 router.post('/excel/preview', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Chưa chọn file' });
   try {
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
-    const sheet = wb.Sheets['Content Calendar']
-      || wb.Sheets[wb.SheetNames.find(n => n.toLowerCase().includes('content'))]
-      || wb.Sheets[wb.SheetNames[0]];
-    if (!sheet) return res.status(400).json({ error: 'Không tìm thấy sheet dữ liệu trong file' });
+    const filename = (req.file.originalname || '').toLowerCase();
+    const isDocx = filename.endsWith('.docx') || req.file.mimetype.includes('wordprocessingml');
+    if (filename.endsWith('.doc') && !isDocx) {
+      return res.status(400).json({ error: 'File .doc (định dạng Word cũ) chưa hỗ trợ — lưu lại dưới dạng .docx hoặc .xlsx rồi tải lên lại' });
+    }
 
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, header: 1 });
+    let sheetNames;
+    let rowsForSheet;
+    if (isDocx) {
+      const tables = await extractTablesFromDocx(req.file.buffer);
+      if (!tables.length) {
+        return res.status(400).json({ error: 'Không tìm thấy bảng (table) nào trong file Word — plan phải được trình bày dưới dạng bảng' });
+      }
+      sheetNames = tables.map((_, i) => `Bảng ${i + 1}`);
+      rowsForSheet = (i) => tables[i];
+    } else {
+      const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+      sheetNames = wb.SheetNames;
+      rowsForSheet = (i) => XLSX.utils.sheet_to_json(wb.Sheets[sheetNames[i]], { defval: null, header: 1 });
+    }
+
+    const requested = clean(req.body?.sheet, 200);
+    let selected = requested ? sheetNames.indexOf(requested) : -1;
+    if (selected < 0 && !requested) {
+      selected = sheetNames.findIndex(n => n === 'Content Calendar');
+      if (selected < 0) selected = sheetNames.findIndex(n => n.toLowerCase().includes('content'));
+    }
+    if (selected < 0) selected = 0;
+
+    const rows = rowsForSheet(selected);
     const headerRow = rows[0] || [];
     const sampleRows = rows.slice(1, 6);
 
     const cols = await resolveColumns(headerRow, sampleRows);
     const posts = parseContentCalendar(rows, cols);
+    const sheetInfo = { sheets: sheetNames, selected_sheet: sheetNames[selected] };
     if (!posts.length) {
-      return res.status(400).json({ error: 'Không đọc được bài nào từ file — kiểm tra cột Ngày và Tên bài' });
+      return res.status(400).json({
+        error: `Không đọc được bài nào từ "${sheetNames[selected]}" — kiểm tra cột Ngày và Tên bài${sheetNames.length > 1 ? ', hoặc thử sheet/bảng khác' : ''}`,
+        ...sheetInfo,
+      });
     }
     if (posts.length > MAX_PLAN_ROWS) {
-      return res.status(400).json({ error: `File có ${posts.length} dòng, vượt giới hạn ${MAX_PLAN_ROWS} dòng mỗi lần tải lên` });
+      return res.status(400).json({ error: `File có ${posts.length} dòng, vượt giới hạn ${MAX_PLAN_ROWS} dòng mỗi lần tải lên`, ...sheetInfo });
     }
-    res.json({ posts, total: posts.length });
+    res.json({ posts, total: posts.length, ...sheetInfo });
   } catch (e) {
     console.error('[public/excel/preview]', e);
     res.status(500).json({ error: e.message });
