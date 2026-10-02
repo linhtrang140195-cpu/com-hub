@@ -7,6 +7,7 @@ import {
 import { copyText } from '../services/clipboard';
 import ConflictAlert from '../components/shared/ConflictAlert';
 import mascotChick from '../assets/mascot-chick.webp';
+import mascotReporter from '../assets/mascot-reporter.png';
 
 const DOW = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 // Brief form the requester fills in when they ask the IC team to write the post.
@@ -515,10 +516,10 @@ export default function PublicTimeline() {
                 <span className="text-[9px] font-extrabold bg-[#E94560] text-white rounded px-1.5 py-px">IC</span> IC viết &amp; đăng
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="text-[9px] font-extrabold bg-slate-100 text-slate-500 rounded px-1.5 py-px">TỰ</span> Người đăng tự đăng
+                <img src={mascotReporter} alt="" className="w-4 h-4 rounded-full object-cover" /> Người đăng tự đăng
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="text-[9px] font-extrabold bg-indigo-50 text-indigo-600 rounded px-1.5 py-px">KẾ HOẠCH</span> Từ plan trong Comms Hub
+                <span className="text-[9px] font-extrabold bg-indigo-50 text-indigo-600 rounded px-1.5 py-px">PLAN</span> Từ plan trong Comms Hub
               </span>
               <span className="w-px h-3.5 bg-slate-200" />
               <span>
@@ -631,21 +632,28 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
         {/* Only slots booked through this board carry an owner. Posts planned in
             Comms Hub have none, and labelling those "tự đăng" would be wrong. */}
         {!editing && p.post_owner && (
-          <span
-            className={`text-[9px] font-extrabold uppercase tracking-wide rounded px-1.5 py-px shrink-0 ${
-              isIC ? 'bg-[#E94560] text-white' : 'bg-slate-100 text-slate-500'
-            }`}
-            title={isIC ? 'IC team viết & đăng' : 'Người đăng tự đăng'}
-          >
-            {isIC ? 'IC' : 'TỰ'}
-          </span>
+          isIC ? (
+            <span
+              className="text-[9px] font-extrabold uppercase tracking-wide rounded px-1.5 py-px shrink-0 bg-[#E94560] text-white"
+              title="IC team viết & đăng"
+            >
+              IC
+            </span>
+          ) : (
+            <img
+              src={mascotReporter}
+              alt="Tự đăng"
+              title="Người đăng tự đăng"
+              className="w-4 h-4 rounded-full object-cover shrink-0"
+            />
+          )
         )}
         {!editing && !p.post_owner && (
           <span
             className="text-[9px] font-extrabold uppercase tracking-wide rounded px-1.5 py-px shrink-0 bg-indigo-50 text-indigo-600"
             title="Bài từ kế hoạch truyền thông trong Comms Hub"
           >
-            Kế hoạch
+            Plan
           </span>
         )}
         {!editing && conflict && (
@@ -657,7 +665,10 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
           </span>
         )}
         {!editing && !conflict && p.post_type && (
-          <span className="text-[9.5px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-px truncate max-w-[66px]">
+          <span
+            title={p.post_type}
+            className="text-[8px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1 py-px truncate max-w-[52px]"
+          >
             {p.post_type}
           </span>
         )}
@@ -1389,7 +1400,7 @@ function PostDetailModal({ post, canEdit, publicKey, email, meta, onClose, onSav
                 </span>
               )}
               {!post.post_owner && (
-                <span className="text-[9px] font-extrabold uppercase rounded px-1.5 py-px bg-indigo-50 text-indigo-600">Kế hoạch</span>
+                <span className="text-[9px] font-extrabold uppercase rounded px-1.5 py-px bg-indigo-50 text-indigo-600">Plan</span>
               )}
               {post.status === 'posted' && (
                 <span className="text-[9px] font-extrabold uppercase rounded px-1.5 py-px bg-emerald-50 text-emerald-700">✓ Đã đăng</span>
