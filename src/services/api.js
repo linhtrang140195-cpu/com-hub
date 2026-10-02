@@ -47,7 +47,12 @@ async function request(path, { method = 'GET', body, headers = {}, isFormData = 
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || `Request failed (${res.status})`);
+    const err = new Error(data?.error || `Request failed (${res.status})`);
+    // Some endpoints put useful context alongside `error` (e.g. excel/preview's
+    // `sheets` list when the default sheet picked happens to have no posts) —
+    // attach the full body so callers can still use it instead of only the message.
+    if (data && typeof data === 'object') err.body = data;
+    throw err;
   }
   return data;
 }

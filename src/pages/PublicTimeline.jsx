@@ -1101,6 +1101,14 @@ function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
       setSheetChoice(result.selected_sheet || '');
     } catch (e) {
       setErr(e.message);
+      // The default sheet/table picked can be the wrong one (0 posts read from
+      // it) while the file still has other usable sheets — the error response
+      // carries that same `sheets` list, so surface it here too instead of
+      // only on a successful read, or the picker to fix it never appears.
+      if (e.body?.sheets?.length > 1) {
+        setSheets(e.body.sheets);
+        setSheetChoice(e.body.selected_sheet || '');
+      }
     } finally {
       setLoading(false);
     }
@@ -1121,6 +1129,7 @@ function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
       setPosts(result.posts);
     } catch (e) {
       setErr(e.message);
+      setPosts(null);
     } finally {
       setLoading(false);
     }
@@ -1191,7 +1200,7 @@ function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
                 <input
                   type="file"
                   accept=".xlsx,.xls,.docx"
-                  onChange={e => { setFile(e.target.files[0]); setErr(''); setSheets([]); setSheetChoice(''); }}
+                  onChange={e => { setFile(e.target.files[0]); setErr(''); setPosts(null); setSheets([]); setSheetChoice(''); }}
                   className="text-[13px]"
                 />
                 <p className="text-[11.5px] text-slate-400 mt-2">
@@ -1200,6 +1209,22 @@ function UploadPlanModal({ me, saveEmail, publicKey, onClose, onSaved }) {
                   chọn đúng cái cần ở bước sau. Tối đa 200 dòng mỗi lần tải lên.
                 </p>
               </div>
+              {/* Shown even while posts is still null — the default sheet/table
+                  picked can be the wrong one (0 posts read from it) while the
+                  file has other usable sheets; without this the only way to
+                  react to that error was re-picking the file from scratch. */}
+              {sheets.length > 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>File này có {sheets.length} sheet/bảng — thử đọc từ:</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sheets.map(name => (
+                      <Chip key={name} on={name === sheetChoice} onClick={() => switchSheet(name)}>
+                        {name}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
               <PickOrType
                 label="Campaign"
                 options={CAMPAIGN_GROUPS}
