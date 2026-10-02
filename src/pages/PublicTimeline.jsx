@@ -516,7 +516,7 @@ export default function PublicTimeline() {
                 <span className="text-[9px] font-extrabold bg-[#E94560] text-white rounded px-1.5 py-px">IC</span> IC viết &amp; đăng
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <img src={mascotReporter} alt="" className="w-4 h-4 rounded-full object-cover" /> Người đăng tự đăng
+                <img src={mascotReporter} alt="" className="w-4 h-4 rounded-full object-cover" /> User tự đăng
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="text-[9px] font-extrabold bg-indigo-50 text-indigo-600 rounded px-1.5 py-px">PLAN</span> Từ plan trong Comms Hub
@@ -643,7 +643,7 @@ function SlotCard({ post: p, mine, isAdmin, conflict, editingTime, setEditingTim
             <img
               src={mascotReporter}
               alt="Tự đăng"
-              title="Người đăng tự đăng"
+              title="User tự đăng"
               className="w-4 h-4 rounded-full object-cover shrink-0"
             />
           )
