@@ -173,6 +173,22 @@ async function runOneOffFixes(conn) {
         ['claim_code:linhtrang.tran@garena.vn', '6HJT6P']
       )),
     },
+    {
+      name: 'seed_seatalk_s2s_client_id_20261002',
+      // One-time seed of the shared client-id for the public_s2s/seatalk
+      // send-message API (per how_to_send_seatalk_message_by_api.md), so the
+      // D-1 17:00 per-PIC reminder cron can DM individual operators instead
+      // of only posting to the team's incoming-webhook group. Seeded here
+      // (not hardcoded in the service) because there is no other way to get
+      // a secret into this deployment's app_settings without a live admin
+      // session; runs exactly once and never overwrites a value an admin
+      // later changes through the app.
+      run: () => conn.query(
+        "INSERT INTO app_settings (`key`, value, updated_by) VALUES (?, ?, 'system') " +
+        "ON DUPLICATE KEY UPDATE value = VALUES(value)",
+        ['seatalk_s2s_client_id', '201992d2-7c1e-453b-95b8-574166867c96']
+      ),
+    },
   ];
 
   for (const fix of fixes) {

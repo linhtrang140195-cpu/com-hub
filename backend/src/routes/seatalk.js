@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { getTodaySchedule, formatReminderText, sendWebhookReminder, getWeekSchedule, formatWeeklyReminderText, sendWeeklyWebhookReminder, sendCampaignWebhookReminder, getTomorrowSchedule, formatTomorrowReminderText, sendTomorrowWebhookReminder } from '../services/seatalkReminder.js';
+import { getTodaySchedule, formatReminderText, sendWebhookReminder, getWeekSchedule, formatWeeklyReminderText, sendWeeklyWebhookReminder, sendCampaignWebhookReminder, getTomorrowSchedule, formatTomorrowReminderText, sendTomorrowWebhookReminder, sendPicRemindersForTomorrow } from '../services/seatalkReminder.js';
 
 const router = Router();
 
@@ -85,6 +85,14 @@ router.post('/send-tomorrow', requireAuth, requireAdmin, async (req, res) => {
     return res.json({ ok: true });
   }
   const result = await sendTomorrowWebhookReminder();
+  res.json(result);
+});
+
+// Manual trigger for the per-PIC D-1 17:00 DM reminders (SeaTalk S2S API,
+// one message per slot to that slot's operator_email) — same data as
+// /tomorrow-text, sent individually instead of to the team group.
+router.post('/send-pic-reminders', requireAuth, requireAdmin, async (req, res) => {
+  const result = await sendPicRemindersForTomorrow();
   res.json(result);
 });
 

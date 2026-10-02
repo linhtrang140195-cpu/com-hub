@@ -1,5 +1,6 @@
 import { query } from '../db.js';
 import { getTeamWebhook } from './settings.js';
+import { sendSeatalkS2SMessage } from './seatalkS2S.js';
 
 export async function getTodaySchedule() {
   const tz = 'Asia/Ho_Chi_Minh';
@@ -198,6 +199,39 @@ export async function sendTomorrowWebhookReminder() {
     total += urlPosts.length;
   }
   return { ok: true, count: total, sent: true };
+}
+
+// One DM per slot per PIC (operator_email), the evening before (D-1, 17:00
+// ICT — same run as the team-wide tomorrow digest above, just a separate
+// per-person channel via the SeaTalk S2S API instead of a group webhook).
+// A PIC with 2 slots tomorrow gets 2 separate messages, one per slot, since
+// each needs its own date/time/channel — no grouping.
+function formatPicReminderText(post) {
+  const when = new Date(post.scheduled_at).toLocaleString('vi-VN', {
+    hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  });
+  const channels = Array.isArray(post.channels) ? post.channels.join(', ') : (post.channels || '');
+  return `Hello, đừng quên slot ${when} với nội dung ngày mai trên ${channels || '—'} nhé bạn iu 😎`;
+}
+
+export async function sendPicRemindersForTomorrow() {
+  const posts = await getTomorrowSchedule();
+  const withPic = posts.filter(p => p.operator_email);
+  if (!withPic.length) return { ok: true, sent: 0, failed: 0 };
+
+  let sent = 0;
+  const failures = [];
+  for (const p of withPic) {
+    try {
+      await sendSeatalkS2SMessage({ emails: [p.operator_email], message: formatPicReminderText(p) });
+      sent++;
+    } catch (e) {
+      // One PIC's send failing (bad email, SeaTalk hiccup) must not block the rest.
+      failures.push({ id: p.id, error: e.message });
+    }
+  }
+  return { ok: failures.length === 0, sent, failed: failures.length, failures };
 }
 
 export async function getWeekSchedule() {

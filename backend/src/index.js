@@ -30,7 +30,7 @@ import tournamentRoutes from './routes/tournament.js';
 import reflectionRoutes from './routes/reflections.js';
 import publicTimelineRoutes from './routes/publicTimeline.js';
 import settingsRoutes from './routes/settings.js';
-import { sendWebhookReminder, sendWeeklyWebhookReminder, sendTomorrowWebhookReminder } from './services/seatalkReminder.js';
+import { sendWebhookReminder, sendWeeklyWebhookReminder, sendTomorrowWebhookReminder, sendPicRemindersForTomorrow } from './services/seatalkReminder.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 import { syncPostsFromWebsite } from './services/tournamentService.js';
 import { query } from './db.js';
@@ -117,6 +117,12 @@ async function start() {
       console.log('[seatalk-tomorrow-cron]', result);
     } catch (e) {
       console.error('[seatalk-tomorrow-cron] error', e.message);
+    }
+    try {
+      const result = await sendPicRemindersForTomorrow();
+      console.log('[seatalk-pic-reminder-cron]', result);
+    } catch (e) {
+      console.error('[seatalk-pic-reminder-cron] error', e.message);
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
 
