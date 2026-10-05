@@ -189,6 +189,25 @@ async function runOneOffFixes(conn) {
         ['seatalk_s2s_client_id', '201992d2-7c1e-453b-95b8-574166867c96']
       ),
     },
+    {
+      name: 'seed_seatalk_dedicated_app_20261005',
+      // A dedicated SeaTalk app for the PIC reminder, so DMs show its own
+      // name/avatar instead of the shared AOV bot. Same one-off-seed
+      // rationale as the client-id above — both rows inserted in one
+      // transaction-less batch is fine since each has its own key.
+      run: () => Promise.all([
+        conn.query(
+          "INSERT INTO app_settings (`key`, value, updated_by) VALUES (?, ?, 'system') " +
+          "ON DUPLICATE KEY UPDATE value = VALUES(value)",
+          ['seatalk_app_id', 'NDUwMTMxNzcwMDQ1']
+        ),
+        conn.query(
+          "INSERT INTO app_settings (`key`, value, updated_by) VALUES (?, ?, 'system') " +
+          "ON DUPLICATE KEY UPDATE value = VALUES(value)",
+          ['seatalk_app_secret', '2UKUUklS_Uh6P8CCkOIqrYGijIsLp6ri']
+        ),
+      ]),
+    },
   ];
 
   for (const fix of fixes) {

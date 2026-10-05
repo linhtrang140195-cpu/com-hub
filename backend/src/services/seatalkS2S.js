@@ -1,6 +1,8 @@
 import { getSetting } from './settings.js';
 
 export const S2S_CLIENT_ID_KEY = 'seatalk_s2s_client_id';
+export const SEATALK_APP_ID_KEY = 'seatalk_app_id';
+export const SEATALK_APP_SECRET_KEY = 'seatalk_app_secret';
 
 // The public_s2s/seatalk/send_message endpoint — unlike the incoming-webhook
 // URLs elsewhere in this service, this can DM an individual by email instead
@@ -15,6 +17,19 @@ export async function getS2SClientId() {
   return getSetting(S2S_CLIENT_ID_KEY, process.env.PUBLIC_S2S_CLIENT_ID);
 }
 
+// A dedicated app (its own display name/avatar in SeaTalk) instead of the
+// shared AOV default — both must be present together or the endpoint 400s,
+// so getSeatalkApp() returns either a complete {appId, appSecret} pair or
+// null, never a half-filled one.
+export async function getSeatalkApp() {
+  const [appId, appSecret] = await Promise.all([
+    getSetting(SEATALK_APP_ID_KEY, process.env.SEATALK_APP_ID),
+    getSetting(SEATALK_APP_SECRET_KEY, process.env.SEATALK_APP_SECRET),
+  ]);
+  if (!appId?.trim() || !appSecret?.trim()) return null;
+  return { appId: appId.trim(), appSecret: appSecret.trim() };
+}
+
 // Sends to one or more emails/groups. Caller decides whether a missing
 // client-id should be silent (best-effort reminder) or surfaced.
 export async function sendSeatalkS2SMessage({ emails, groupIds, message, eventSource = 'BookingSystem' }) {
@@ -25,6 +40,8 @@ export async function sendSeatalkS2SMessage({ emails, groupIds, message, eventSo
   const cleanGroups = (groupIds || []).map(g => String(g).trim()).filter(Boolean);
   if (!cleanEmails.length && !cleanGroups.length) throw new Error('Cần ít nhất 1 email hoặc group');
 
+  const app = await getSeatalkApp();
+
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'client-id': clientId },
@@ -33,6 +50,7 @@ export async function sendSeatalkS2SMessage({ emails, groupIds, message, eventSo
       ...(cleanGroups.length ? { groupIds: cleanGroups } : {}),
       message,
       eventSource,
+      ...(app ? { app_id: app.appId, app_secret: app.appSecret } : {}),
     }),
     signal: AbortSignal.timeout(60000),
   });
