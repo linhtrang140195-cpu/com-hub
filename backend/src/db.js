@@ -230,6 +230,17 @@ async function runOneOffFixes(conn) {
         ['gigi_s2s_client_id', 'kL6-R3-HgNncNJGL5K2KopWs2ZnjZ7_ln7nNY92ZBhI']
       ),
     },
+    {
+      name: 'backfill_gigi_new_hire_operator_email_20261005',
+      // The first couple of new-hire posts were created before operator_email
+      // got wired up (see gigiNewHires.js) -- without this they'd never get a
+      // D-1 PIC reminder DM even though every post synced after this fix will.
+      run: () => conn.query(
+        `UPDATE posts p JOIN campaigns c ON c.id = p.campaign_id
+         SET p.operator_email = 'linhtrang.tran@garena.vn'
+         WHERE c.name = 'Nhân viên mới' AND p.operator_email IS NULL`
+      ),
+    },
   ];
 
   for (const fix of fixes) {
