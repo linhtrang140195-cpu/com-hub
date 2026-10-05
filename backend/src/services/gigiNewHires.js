@@ -1,5 +1,5 @@
 import { query, newId } from '../db.js';
-import { getGigiClientId, getTeamWebhook } from './settings.js';
+import { getGigiClientId, getIcRequestWebhook } from './settings.js';
 
 const ENDPOINT = 'https://gigi.garena.vn/s2s/ticket/get-tickets-by-form-ids';
 const NEW_HIRE_FORM_ID = 36;
@@ -74,7 +74,12 @@ function buildDescription(form, ticketId) {
 }
 
 async function notifyNewHire(form, ticketId, title, scheduledAt) {
-  const url = await getTeamWebhook();
+  // Same destination every other "someone just booked something" ping uses
+  // (notifyNewBooking in publicTimeline.js) -- the IC-specific group when one
+  // is configured, falling back to the team digest group otherwise. Posting
+  // to the team group directly, as this did before, landed somewhere the
+  // person actually watching bookings doesn't check as closely.
+  const url = await getIcRequestWebhook();
   if (!url) return;
   const when = scheduledAt.toLocaleString('vi-VN', {
     weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -100,6 +105,7 @@ async function notifyNewHire(form, ticketId, title, scheduledAt) {
     body: JSON.stringify({ tag: 'text', text: { content: text } }),
   });
   if (!res.ok) throw new Error(`SeaTalk webhook ${res.status}`);
+  console.log(`[gigi-new-hire] group ping sent for ticket ${ticketId}`);
 }
 
 // Pulls form 36 (new-hire registration) from Gigi, and for any ticket not
