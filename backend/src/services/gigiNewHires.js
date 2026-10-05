@@ -6,12 +6,8 @@ const NEW_HIRE_FORM_ID = 36;
 const CAMPAIGN_NAME = 'Nhân viên mới';
 const CAMPAIGN_COLOR = '#7C5CE6';
 
-// TODO: confirm the real ticket-detail URL format with the user (the Gigi
-// S2S doc only documents the API, not its UI routes) and fill this in —
-// until then the notes/notification carry the raw ticket id instead of a
-// clickable link, rather than a guessed URL that might be wrong.
-function gigiTicketLink(_ticketId) {
-  return null;
+function gigiTicketLink(ticketId) {
+  return `https://gigi.garena.vn/ticket/${ticketId}`;
 }
 
 async function fetchNewHireTickets() {
@@ -64,7 +60,7 @@ function buildDescription(form, ticketId) {
     form.startDate ? `📅 Ngày onboard: ${form.startDate}` : null,
     form.reportingManager ? `👔 Quản lý: ${form.reportingManager}` : null,
     form.projectManager ? `🧭 Project manager: ${form.projectManager}` : null,
-    `🔗 Gigi ticket: ${gigiTicketLink(ticketId) || `#${ticketId} (chưa có link — cần bổ sung format URL)`}`,
+    `🔗 Gigi ticket: ${gigiTicketLink(ticketId)}`,
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -72,14 +68,13 @@ function buildDescription(form, ticketId) {
 async function notifyNewHire(form, ticketId) {
   const url = await getTeamWebhook();
   if (!url) return;
-  const link = gigiTicketLink(ticketId);
   const text = [
     '🆕 NHÂN VIÊN MỚI',
     '',
     form.name ? `Tên: ${form.name}` : null,
     form.team ? `Team: ${form.team}` : null,
     form.startDate ? `Ngày onboard: ${form.startDate}` : null,
-    link ? `🔗 ${link}` : `🔗 Gigi ticket #${ticketId}`,
+    `🔗 ${gigiTicketLink(ticketId)}`,
   ].filter(Boolean).join('\n');
 
   const res = await fetch(url, {
