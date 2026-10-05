@@ -1679,8 +1679,55 @@ function TeamWebhookPanel() {
               tới sáng hôm sau. Muốn báo riêng cho mình thì tạo một group SeaTalk chỉ có bạn rồi dán
               webhook của group đó vào đây. Để trống thì dùng chung group digest ở trên.</>}
           />
+          <GigiSyncRow />
         </div>
       )}
+    </div>
+  );
+}
+
+function GigiSyncRow() {
+  const [state, setState] = useState(''); // '' | 'running' | 'done'
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState('');
+
+  const run = async () => {
+    setState('running'); setErr(''); setResult(null);
+    try {
+      const r = await api.post('/settings/gigi/sync-new-hires', {});
+      setResult(r);
+      setState('done');
+    } catch (e) {
+      setErr(e.message);
+      setState('');
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 py-3 border-t border-slate-100">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[12.5px] font-bold">🎉 Đồng bộ nhân viên mới (Gigi)</span>
+      </div>
+      <div className="text-[11.5px] text-slate-500 leading-relaxed">
+        Chạy tự động 10:00 mỗi ngày — kéo ticket "Đăng ký thông tin nhân viên mới" từ Gigi,
+        ticket nào chưa có lịch thì tự tạo 1 item trên calendar + báo vào group chung.
+      </div>
+      <div>
+        <button
+          onClick={run}
+          disabled={state === 'running'}
+          className="rounded-lg px-4 py-2 text-[12.5px] font-bold border border-slate-200 hover:border-slate-400 cursor-pointer disabled:opacity-50"
+        >
+          {state === 'running' ? 'Đang chạy…' : '▶️ Chạy thử ngay'}
+        </button>
+      </div>
+      {result && (
+        <div className="text-[12px] font-semibold text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+          Tạo mới {result.created ?? 0} · bỏ qua (đã có) {result.skipped ?? 0}
+          {result.failed ? ` · lỗi ${result.failed}` : ''}
+        </div>
+      )}
+      {err && <div className="text-[12px] font-semibold text-[#E94560] bg-red-50 rounded-lg px-3 py-2">{err}</div>}
     </div>
   );
 }
