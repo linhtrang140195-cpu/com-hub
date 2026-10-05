@@ -92,7 +92,7 @@ async function notifyNewHire(form, ticketId) {
 // state, so gigi_synced_tickets is what makes this idempotent.
 export async function syncNewHiresFromGigi() {
   const tickets = await fetchNewHireTickets();
-  if (!tickets.length) return { ok: true, created: 0, skipped: 0 };
+  if (!tickets.length) return { ok: true, created: 0, skipped: 0, skipped_past: 0 };
 
   const { rows: already } = await query(
     `SELECT ticket_id FROM gigi_synced_tickets WHERE ticket_id IN (${tickets.map(() => '?').join(',') || 'NULL'})`,
@@ -100,13 +100,27 @@ export async function syncNewHiresFromGigi() {
   );
   const syncedIds = new Set(already.map(r => r.ticket_id));
 
+  // "Latest 10 tickets" is by ticket creation time, not onboarding date — the
+  // API can and does hand back people who already started months ago. Only
+  // today-or-later (VN calendar day) gets a calendar slot; older ones are
+  // still marked synced (post_id NULL) so they're not re-evaluated forever.
+  const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }); // YYYY-MM-DD
+
   let created = 0;
   let skipped = 0;
+  let skippedPast = 0;
   const failures = [];
 
   for (const ticket of tickets) {
     if (syncedIds.has(ticket.id)) { skipped++; continue; }
     const form = ticket.form_data || {};
+
+    if (form.startDate && form.startDate < todayVN) {
+      await query('INSERT INTO gigi_synced_tickets (ticket_id, post_id) VALUES (?, NULL)', [ticket.id]);
+      skippedPast++;
+      continue;
+    }
+
     try {
       const campaignId = await resolveNewHireCampaign();
       const scheduledAt = form.startDate ? new Date(`${form.startDate}T16:00:00+07:00`) : new Date(ticket.create_time);
@@ -133,5 +147,5 @@ export async function syncNewHiresFromGigi() {
     }
   }
 
-  return { ok: failures.length === 0, created, skipped, failed: failures.length, failures };
+  return { ok: failures.length === 0, created, skipped, skipped_past: skippedPast, failed: failures.length, failures };
 }

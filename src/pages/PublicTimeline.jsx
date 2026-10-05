@@ -1723,7 +1723,7 @@ function GigiSyncRow() {
       </div>
       {result && (
         <div className="text-[12px] font-semibold text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
-          Tạo mới {result.created ?? 0} · bỏ qua (đã có) {result.skipped ?? 0}
+          Tạo mới {result.created ?? 0} · bỏ qua (đã có) {result.skipped ?? 0} · bỏ qua (ngày cũ) {result.skipped_past ?? 0}
           {result.failed ? ` · lỗi ${result.failed}` : ''}
         </div>
       )}
