@@ -9,6 +9,10 @@ const CAMPAIGN_COLOR = '#7C5CE6';
 // và giới thiệu nhân viên mới ... Seatalk Internal Communication ... & Sailor").
 const CHANNELS = ['SeaTalk', 'Sailor'];
 const BOARD_URL = 'https://comms-hub.demo.ved.com.vn/timeline';
+// Who actually posts the new-hire intro — set as operator_email so the
+// existing D-1 17:00 per-PIC SeaTalk reminder also covers this slot, the
+// same as any booked slot with a PIC.
+const DEFAULT_PIC_EMAIL = 'linhtrang.tran@garena.vn';
 
 function gigiTicketLink(ticketId) {
   return `https://gigi.garena.vn/ticket/${ticketId}`;
@@ -140,9 +144,9 @@ export async function syncNewHiresFromGigi() {
       const title = buildTitle(form.name, form.team);
       const postId = newId();
       await query(
-        `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, description, channels, status, post_owner)
-         VALUES (?, ?, ?, 'Announce', ?, ?, ?, 'scheduled', NULL)`,
-        [postId, campaignId, scheduledAt, title, buildDescription(form, ticket.id), JSON.stringify(CHANNELS)]
+        `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, description, channels, status, post_owner, operator_email)
+         VALUES (?, ?, ?, 'Announce', ?, ?, ?, 'scheduled', NULL, ?)`,
+        [postId, campaignId, scheduledAt, title, buildDescription(form, ticket.id), JSON.stringify(CHANNELS), DEFAULT_PIC_EMAIL]
       );
       await query(
         'INSERT INTO gigi_synced_tickets (ticket_id, post_id) VALUES (?, ?)',
