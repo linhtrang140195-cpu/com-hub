@@ -212,7 +212,7 @@ function formatPicReminderText(post) {
     timeZone: 'Asia/Ho_Chi_Minh',
   });
   const channels = Array.isArray(post.channels) ? post.channels.join(', ') : (post.channels || '');
-  return `Hello, đừng quên slot ${when} với ${post.title || 'bài đã book'} trên ${channels || '—'} nhé bạn iu 😎`;
+  return `Hello, đừng quên lịch đăng: ${post.title || 'bài đã book'} trên ${channels || '—'}, slot ${when} nhé bạn iu 😎`;
 }
 
 export async function sendPicRemindersForTomorrow() {
