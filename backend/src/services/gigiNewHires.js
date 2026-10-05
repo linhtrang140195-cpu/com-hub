@@ -109,7 +109,7 @@ export async function syncNewHiresFromGigi() {
     const form = ticket.form_data || {};
     try {
       const campaignId = await resolveNewHireCampaign();
-      const scheduledAt = form.startDate ? new Date(`${form.startDate}T09:00:00+07:00`) : new Date(ticket.create_time);
+      const scheduledAt = form.startDate ? new Date(`${form.startDate}T16:00:00+07:00`) : new Date(ticket.create_time);
       const postId = newId();
       await query(
         `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, description, channels, status, post_owner)
