@@ -31,6 +31,7 @@ import reflectionRoutes from './routes/reflections.js';
 import publicTimelineRoutes from './routes/publicTimeline.js';
 import settingsRoutes from './routes/settings.js';
 import { sendWebhookReminder, sendWeeklyWebhookReminder, sendTomorrowWebhookReminder, sendPicRemindersForTomorrow } from './services/seatalkReminder.js';
+import { syncNewHiresFromGigi } from './services/gigiNewHires.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 import { syncPostsFromWebsite } from './services/tournamentService.js';
 import { query } from './db.js';
@@ -96,6 +97,17 @@ async function start() {
       console.log('[seatalk-cron]', result);
     } catch (e) {
       console.error('[seatalk-cron] error', e.message);
+    }
+  }, { timezone: 'Asia/Ho_Chi_Minh' });
+
+  // New-hire sync from Gigi (form 36) at 10:00 ICT — creates a calendar item
+  // + group ping for any ticket not already synced.
+  cron.schedule('0 10 * * *', async () => {
+    try {
+      const result = await syncNewHiresFromGigi();
+      console.log('[gigi-new-hire-cron]', result);
+    } catch (e) {
+      console.error('[gigi-new-hire-cron] error', e.message);
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
 

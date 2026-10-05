@@ -119,6 +119,16 @@ async function runMigrations() {
       updated_by     VARCHAR(255),
       INDEX idx_ca_lookup (channel, campaign_id, effective_from)
     )` },
+
+    // Dedup for the Gigi new-hire sync (form_id 36) — the API always returns
+    // the latest 10 tickets regardless of what was already synced, so this is
+    // the only thing stopping the same new hire from getting a fresh calendar
+    // item (and a fresh group ping) every single day.
+    { name: 'gigi_synced_tickets', sql: `CREATE TABLE IF NOT EXISTS gigi_synced_tickets (
+      ticket_id  INT PRIMARY KEY,
+      post_id    CHAR(36) NULL,
+      synced_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    )` },
   ];
   const conn = await pool.getConnection();
   try {
@@ -207,6 +217,18 @@ async function runOneOffFixes(conn) {
           ['seatalk_app_secret', '2UKUUklS_Uh6P8CCkOIqrYGijIsLp6ri']
         ),
       ]),
+    },
+    {
+      name: 'seed_gigi_s2s_client_id_20261005',
+      // One-time seed of the Gigi S2S client-id (get-tickets-by-form-ids),
+      // used by the daily new-hire sync. Same rationale as the SeaTalk
+      // client-id above: no other way to get a secret into this
+      // deployment's app_settings without a live admin session.
+      run: () => conn.query(
+        "INSERT INTO app_settings (`key`, value, updated_by) VALUES (?, ?, 'system') " +
+        "ON DUPLICATE KEY UPDATE value = VALUES(value)",
+        ['gigi_s2s_client_id', 'kL6-R3-HgNncNJGL5K2KopWs2ZnjZ7_ln7nNY92ZBhI']
+      ),
     },
   ];
 

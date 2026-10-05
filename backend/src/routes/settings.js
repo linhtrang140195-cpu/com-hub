@@ -5,6 +5,7 @@ import {
   TEAM_WEBHOOK_KEY, IC_WEBHOOK_KEY,
 } from '../services/settings.js';
 import { getTodaySchedule, formatReminderText } from '../services/seatalkReminder.js';
+import { syncNewHiresFromGigi } from '../services/gigiNewHires.js';
 
 const router = Router();
 
@@ -88,6 +89,13 @@ router.post('/ic-webhook/test', async (req, res) => {
   });
   if (!r.ok) return res.status(502).json({ error: `SeaTalk trả về lỗi ${r.status}` });
   res.json({ ok: true });
+});
+
+// Manual trigger for the daily Gigi new-hire sync (form 36), so it can be
+// tested without waiting for the 10:00 cron.
+router.post('/gigi/sync-new-hires', async (_req, res) => {
+  const result = await syncNewHiresFromGigi();
+  res.json(result);
 });
 
 export default router;
