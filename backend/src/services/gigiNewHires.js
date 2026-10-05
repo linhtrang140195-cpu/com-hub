@@ -5,6 +5,10 @@ const ENDPOINT = 'https://gigi.garena.vn/s2s/ticket/get-tickets-by-form-ids';
 const NEW_HIRE_FORM_ID = 36;
 const CAMPAIGN_NAME = 'Nhân viên mới';
 const CAMPAIGN_COLOR = '#7C5CE6';
+// Matches the real onboarding checklist in form 36's own initialTasks ("Add
+// và giới thiệu nhân viên mới ... Seatalk Internal Communication ... & Sailor").
+const CHANNELS = ['SeaTalk', 'Sailor'];
+const BOARD_URL = 'https://comms-hub.demo.ved.com.vn/timeline';
 
 function gigiTicketLink(ticketId) {
   return `https://gigi.garena.vn/ticket/${ticketId}`;
@@ -65,16 +69,25 @@ function buildDescription(form, ticketId) {
   return lines.join('\n');
 }
 
-async function notifyNewHire(form, ticketId) {
+async function notifyNewHire(form, ticketId, title, scheduledAt) {
   const url = await getTeamWebhook();
   if (!url) return;
+  const when = scheduledAt.toLocaleString('vi-VN', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Asia/Ho_Chi_Minh',
+  });
   const text = [
     '🆕 NHÂN VIÊN MỚI',
     '',
     form.name ? `Tên: ${form.name}` : null,
     form.team ? `Team: ${form.team}` : null,
-    form.startDate ? `Ngày onboard: ${form.startDate}` : null,
+    `Tiêu đề: ${title}`,
+    `Kênh: ${CHANNELS.join(', ')}`,
+    `Lịch đăng: ${when}`,
     `🔗 ${gigiTicketLink(ticketId)}`,
+    '',
+    `📅 Xem lịch: ${BOARD_URL}`,
   ].filter(Boolean).join('\n');
 
   const res = await fetch(url, {
@@ -124,18 +137,19 @@ export async function syncNewHiresFromGigi() {
     try {
       const campaignId = await resolveNewHireCampaign();
       const scheduledAt = form.startDate ? new Date(`${form.startDate}T16:00:00+07:00`) : new Date(ticket.create_time);
+      const title = buildTitle(form.name, form.team);
       const postId = newId();
       await query(
         `INSERT INTO posts (id, campaign_id, scheduled_at, post_type, title, description, channels, status, post_owner)
          VALUES (?, ?, ?, 'Announce', ?, ?, ?, 'scheduled', NULL)`,
-        [postId, campaignId, scheduledAt, buildTitle(form.name, form.team), buildDescription(form, ticket.id), JSON.stringify(['SeaTalk'])]
+        [postId, campaignId, scheduledAt, title, buildDescription(form, ticket.id), JSON.stringify(CHANNELS)]
       );
       await query(
         'INSERT INTO gigi_synced_tickets (ticket_id, post_id) VALUES (?, ?)',
         [ticket.id, postId]
       );
       try {
-        await notifyNewHire(form, ticket.id);
+        await notifyNewHire(form, ticket.id, title, scheduledAt);
       } catch (e) {
         // The calendar item is already created; a failed group ping must not
         // undo that or retry the whole ticket tomorrow.
