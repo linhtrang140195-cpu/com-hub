@@ -30,7 +30,7 @@ import tournamentRoutes from './routes/tournament.js';
 import reflectionRoutes from './routes/reflections.js';
 import publicTimelineRoutes from './routes/publicTimeline.js';
 import settingsRoutes from './routes/settings.js';
-import { sendWebhookReminder, sendWeeklyWebhookReminder, sendTomorrowWebhookReminder, sendPicRemindersForTomorrow } from './services/seatalkReminder.js';
+import { sendWebhookReminder, sendWeeklyWebhookReminder, sendTomorrowWebhookReminder, sendPicRemindersForToday } from './services/seatalkReminder.js';
 import { syncNewHiresFromGigi } from './services/gigiNewHires.js';
 import { syncAllLinkedCampaigns } from './services/nhaiDaySync.js';
 import { syncPostsFromWebsite } from './services/tournamentService.js';
@@ -100,6 +100,18 @@ async function start() {
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
 
+  // Per-PIC DM at 09:00 ICT — a same-day morning heads-up for whatever that
+  // person has scheduled today (separate from the 08:00 team-wide digest
+  // above, which goes to the group, not the individual).
+  cron.schedule('0 9 * * *', async () => {
+    try {
+      const result = await sendPicRemindersForToday();
+      console.log('[seatalk-pic-reminder-cron]', result);
+    } catch (e) {
+      console.error('[seatalk-pic-reminder-cron] error', e.message);
+    }
+  }, { timezone: 'Asia/Ho_Chi_Minh' });
+
   // New-hire sync from Gigi (form 36) at 10:00 ICT — creates a calendar item
   // + group ping for any ticket not already synced.
   cron.schedule('0 10 * * *', async () => {
@@ -129,12 +141,6 @@ async function start() {
       console.log('[seatalk-tomorrow-cron]', result);
     } catch (e) {
       console.error('[seatalk-tomorrow-cron] error', e.message);
-    }
-    try {
-      const result = await sendPicRemindersForTomorrow();
-      console.log('[seatalk-pic-reminder-cron]', result);
-    } catch (e) {
-      console.error('[seatalk-pic-reminder-cron] error', e.message);
     }
   }, { timezone: 'Asia/Ho_Chi_Minh' });
 
