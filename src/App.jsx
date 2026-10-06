@@ -61,7 +61,10 @@ function AppRoutes() {
         <Route path="/operator/history" element={<PostHistory />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* Root domain (and any unmatched path) lands regular staff on the
+          public board, not a login wall -- most people hitting this app
+          never need an account at all. Admin still reaches /login directly. */}
+      <Route path="*" element={<Navigate to="/timeline" replace />} />
     </Routes>
   );
 }
