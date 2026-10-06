@@ -44,6 +44,7 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         {/* Admin */}
+        <Route path="/admin" element={<Navigate to="/admin/timeline" replace />} />
         <Route path="/admin/timeline" element={<ProtectedRoute role="admin"><MasterTimeline /></ProtectedRoute>} />
         <Route path="/admin/calendar" element={<ProtectedRoute role="admin"><MasterCalendar /></ProtectedRoute>} />
         <Route path="/admin/campaigns" element={<ProtectedRoute role="admin"><CampaignList /></ProtectedRoute>} />
