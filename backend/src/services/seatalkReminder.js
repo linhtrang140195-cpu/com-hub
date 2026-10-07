@@ -206,13 +206,15 @@ export async function sendTomorrowWebhookReminder() {
 // S2S API instead of a group webhook. A PIC with 2 slots today gets 2
 // separate messages, one per slot, since each needs its own time/channel —
 // no grouping.
+const BOARD_URL = 'https://comms-hub.demo.ved.com.vn/timeline';
+
 function formatPicReminderText(post) {
   const when = new Date(post.scheduled_at).toLocaleString('vi-VN', {
     hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit',
     timeZone: 'Asia/Ho_Chi_Minh',
   });
   const channels = Array.isArray(post.channels) ? post.channels.join(', ') : (post.channels || '');
-  return `Hello, đừng quên lịch đăng: ${post.title || 'bài đã book'} trên ${channels || '—'}, slot ${when} nhé bạn iu 😎`;
+  return `Hello, đừng quên lịch đăng: ${post.title || 'bài đã book'} trên ${channels || '—'}, slot ${when} nhé bạn iu 😎\n📅 Xem lịch: ${BOARD_URL}`;
 }
 
 export async function sendPicRemindersForToday() {
